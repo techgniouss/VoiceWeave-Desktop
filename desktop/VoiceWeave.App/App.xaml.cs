@@ -46,14 +46,18 @@ public partial class App : Application
             return;
         }
 
+        AppDomain.CurrentDomain.UnhandledException += (_, args) => DiagLog.Write("CRASH: " + args.ExceptionObject);
+        TaskScheduler.UnobservedTaskException += (_, args) => DiagLog.Write("background error: " + args.Exception.GetBaseException());
         DispatcherUnhandledException += (_, args) =>
         {
+            DiagLog.Write("UI error: " + args.Exception);
             _overlay?.ShowToast("Something went wrong: " + args.Exception.Message, 5000);
             args.Handled = true;
         };
 
         _settings = Settings.Load();
         Directory.CreateDirectory(AppPaths.Root);
+        DiagLog.Write($"started v{typeof(App).Assembly.GetName().Version}; language={_settings.Language} roman={_settings.RomanOutput}; models={AppPaths.Models}");
         if (!File.Exists(AppPaths.Dictionary)) File.WriteAllText(AppPaths.Dictionary, DefaultDictionary);
 
         _overlay = new OverlayWindow(_settings);
@@ -139,8 +143,12 @@ public partial class App : Application
 
         _mic.Samples += _controller.PushLevel;
         _controller.Level += rms => Dispatcher.BeginInvoke(() => _overlay.PushLevel(rms));
+        _controller.StateChanged += state => DiagLog.Write($"state: {state}");
         _controller.StateChanged += state => Dispatcher.BeginInvoke(() => _overlay.SetState(state, _controller.IsLatched));
+        _controller.Message += text => DiagLog.Write("message: " + text);
         _controller.Message += text => Dispatcher.BeginInvoke(() => _overlay.ShowToast(text, 3500));
+        _controller.Pasted += (r, total) => DiagLog.Write(
+            $"pasted ({_router.LastLanguage}): {r.Final.Length} chars, total {total.TotalSeconds:F2}s (speech {r.AsrTime.TotalSeconds:F2}s, cleanup {r.CleanupTime.TotalSeconds:F2}s)");
         _controller.Pasted += (r, total) => Dispatcher.BeginInvoke(() =>
             _tray.SetStatus($"Last: {total.TotalSeconds:F1}s (speech {r.AsrTime.TotalSeconds:F1}s, cleanup {r.CleanupTime.TotalSeconds:F1}s)"));
     }
@@ -174,6 +182,7 @@ public partial class App : Application
         };
         _tray.LanguageSelected += language =>
         {
+            DiagLog.Write("language selected: " + language);
             _settings.Language = Languages.Code(language);
             _settings.Save();
             _router.Current = language;
@@ -199,6 +208,7 @@ public partial class App : Application
 
     private void Status(string text, bool toast)
     {
+        DiagLog.Write("status: " + text);
         Dispatcher.BeginInvoke(() =>
         {
             _tray.SetStatus(text);
@@ -224,7 +234,9 @@ public partial class App : Application
         {
             await foreach (var (ev, t) in events.Reader.ReadAllAsync(_exit.Token))
             {
-                switch (machine.On(ev, t))
+                var action = machine.On(ev, t);
+                if (action != HotkeyAction.None) DiagLog.Write($"hotkey: {ev} -> {action}");
+                switch (action)
                 {
                     case HotkeyAction.StartRecording: _controller.Begin(latched: false); break;
                     case HotkeyAction.StopAndTranscribe: _controller.Finish(); break;
