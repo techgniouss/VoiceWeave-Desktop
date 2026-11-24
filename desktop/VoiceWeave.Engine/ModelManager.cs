@@ -5,7 +5,10 @@ using System.Security.Cryptography;
 namespace VoiceWeave.Engine;
 
 /// <summary>A downloadable model file pinned by size and SHA-256.</summary>
-public sealed record ModelSpec(string Name, string Url, string Sha256, long Size);
+/// <param name="Transform">Optional step run on the verified download before it is installed (for example adding metadata).</param>
+/// <param name="InstalledSize">Size of the file after <paramref name="Transform"/>; defaults to <paramref name="Size"/>.</param>
+public sealed record ModelSpec(string Name, string Url, string Sha256, long Size,
+    Func<string, Task>? Transform = null, long? InstalledSize = null);
 
 /// <summary>Downloads model files once, resumable, verified against a pinned hash, installed atomically.</summary>
 public sealed class ModelManager(HttpClient http)
@@ -19,8 +22,10 @@ public sealed class ModelManager(HttpClient http)
 
         if (File.Exists(final))
         {
-            if (new FileInfo(final).Length == spec.Size &&
-                (MarkerMatches(marker, spec) || string.Equals(await HashAsync(final, ct), spec.Sha256, StringComparison.OrdinalIgnoreCase)))
+            // A transformed file no longer matches the pinned hash, so only the marker written at install time can vouch for it.
+            if (new FileInfo(final).Length == (spec.InstalledSize ?? spec.Size) &&
+                (MarkerMatches(marker, spec) ||
+                 (spec.Transform == null && string.Equals(await HashAsync(final, ct), spec.Sha256, StringComparison.OrdinalIgnoreCase))))
             {
                 await File.WriteAllTextAsync(marker, spec.Sha256, ct);
                 progress?.Report(1);
@@ -59,6 +64,16 @@ public sealed class ModelManager(HttpClient http)
         {
             File.Delete(part);
             throw new InvalidDataException($"{spec.Name} failed its SHA-256 check; the download was discarded.");
+        }
+
+        if (spec.Transform != null)
+        {
+            await spec.Transform(part);
+            if (new FileInfo(part).Length != (spec.InstalledSize ?? spec.Size))
+            {
+                File.Delete(part);
+                throw new InvalidDataException($"{spec.Name} has an unexpected size after processing; it was discarded.");
+            }
         }
 
         File.Move(part, final, overwrite: true);

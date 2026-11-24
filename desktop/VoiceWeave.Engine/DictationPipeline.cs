@@ -12,6 +12,12 @@ public sealed class DictationPipeline(IAsr asr, CleanupService cleanup, CoreDict
     /// <summary>Replaceable at runtime so edits to the dictionary file apply without a restart.</summary>
     public CoreDictionary Dictionary { get; set; } = dictionary;
 
+    /// <summary>Whether to run the cleanup model on this text; off for languages the model does not support.</summary>
+    public Func<bool> CleanupEnabled { get; set; } = () => true;
+
+    /// <summary>Last step on the finished text, for example writing Indian languages in English letters.</summary>
+    public Func<string, string> Finish { get; set; } = text => text;
+
     public const int SampleRate = 16000;
     private const double MinSeconds = 0.2;
     private const float SilencePeak = 0.01f;
@@ -28,7 +34,8 @@ public sealed class DictationPipeline(IAsr asr, CleanupService cleanup, CoreDict
 
         var corrected = Dictionary.Apply(raw);
         sw.Restart();
-        var final = cleanup.Run(corrected, tone, Dictionary.Terms);
+        var cleaned = CleanupEnabled() ? cleanup.Run(corrected, tone, Dictionary.Terms) : corrected;
+        var final = Finish(cleaned).Trim();
         return new PipelineResult(raw, corrected, final, asrTime, sw.Elapsed);
     }
 

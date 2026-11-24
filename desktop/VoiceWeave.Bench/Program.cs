@@ -7,6 +7,7 @@ if (args.Length >= 2 && args[0] == "llama-probe")
     await LlamaProbe.Run(args[1]);
     return 0;
 }
+if (args.Length >= 1 && args[0] == "regional") return await RegionalCheck.Run(args);
 if (args.Length >= 1 && args[0] == "dictate") return await DictateCommand.Run(args);
 if (args.Length >= 1 && args[0] == "mic-test") return await WinChecks.MicTest();
 if (args.Length >= 1 && args[0] == "hook-test") return await WinChecks.HookTest();

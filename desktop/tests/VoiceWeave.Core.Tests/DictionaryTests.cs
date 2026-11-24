@@ -52,4 +52,19 @@ public class DictionaryTests
         var d = Dictionary.Parse("quark us => Quarkus");
         Assert.Equal("Deploy Quarkus, then stop.", d.Apply("Deploy quark us, then stop."));
     }
+
+    [Fact]
+    public void IndicScriptWords_AreMatchedWhole_IncludingVowelSigns()
+    {
+        // Telugu "Hyderabad" (హైదరాబాద్) and a dictionary entry that rewrites it; vowel signs must not split the word.
+        var d = Dictionary.Parse("హైదరాబాద్ => Hyderabad");
+        Assert.Equal("నేను రేపు Hyderabad వెళ్తున్నాను", d.Apply("నేను రేపు హైదరాబాద్ వెళ్తున్నాను"));
+    }
+
+    [Fact]
+    public void IndicWord_NotReplacedInsideALongerWord()
+    {
+        var d = Dictionary.Parse("కల => Kala");
+        Assert.Equal("కలకత్తా", d.Apply("కలకత్తా"));
+    }
 }

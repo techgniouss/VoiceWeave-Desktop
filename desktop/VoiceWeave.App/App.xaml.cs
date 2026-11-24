@@ -27,6 +27,9 @@ public partial class App : Application
     private KeyboardHook? _hook;
     private DictationController _controller = null!;
     private DictationPipeline? _pipeline;
+    private EngineManager _engines = null!;
+    private AsrRouter _router = null!;
+    private System.Net.Http.HttpClient? _http;
     private FileSystemWatcher? _watcher;
     private readonly StartupRegistration _startup = new();
     private readonly CancellationTokenSource _exit = new();
@@ -57,11 +60,11 @@ public partial class App : Application
         _overlay.Show();
         if (!_settings.BarVisible) _overlay.Hide();
 
-        _tray = new TrayIcon(_settings.BarVisible, _startup.IsEnabled());
+        _tray = new TrayIcon(_settings.BarVisible, _startup.IsEnabled(), Languages.Parse(_settings.Language), _settings.RomanOutput);
         WireTray();
 
-        var ready = LoadPipelineAsync();
-        StartAudioAndController(ready);
+        InitEngines();
+        StartAudioAndController();
         WireOverlay();
         StartHotkey();
         WatchDictionary();
@@ -70,30 +73,35 @@ public partial class App : Application
 
     // ---- models and pipeline -------------------------------------------------------------------------------------
 
-    private async Task LoadPipelineAsync()
+    private void InitEngines()
     {
+        _http = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        _engines = new EngineManager(new ModelManager(_http), AppPaths.Models, LanguagePacks.For);
+        var language = Languages.Parse(_settings.Language);
+        _router = new AsrRouter(_engines.Get, language);
+        _pipeline = new DictationPipeline(_router, new CleanupService(new LlamaCleaner(AppPaths.Models)), LoadDictionary())
+        {
+            // The cleanup model only understands English; regional text keeps what the recogniser wrote, plus the dictionary.
+            CleanupEnabled = () => Languages.UsesCleanup(_router.LastLanguage),
+            Finish = text => _settings.RomanOutput && _router.LastLanguage != Language.English ? Romanizer.Convert(text) : text,
+        };
+        _ = PrepareLanguageAsync(language);
+    }
+
+    /// <summary>Downloads (first time only) and loads a language's models, telling the user how it is going.</summary>
+    private async Task PrepareLanguageAsync(Language language)
+    {
+        var name = Languages.DisplayName(language);
         try
         {
-            var dir = AppPaths.Models;
-            using var http = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-            var manager = new ModelManager(http);
-            var files = Parakeet.Files.Append(LlamaCleaner.File).ToArray();
-            foreach (var spec in files)
-            {
-                var name = Path.GetFileName(spec.Name);
-                var progress = new Progress<double>(p => Status($"Downloading {name}: {p:P0}", toast: spec.Size > 50_000_000));
-                await manager.EnsureAsync(spec, dir, progress, _exit.Token);
-            }
-            Status("Loading speech model…", toast: true);
-            var asr = await Task.Run(() => new Parakeet(dir), _exit.Token);
-            var cleaner = new LlamaCleaner(dir);
-            _pipeline = new DictationPipeline(asr, new CleanupService(cleaner), LoadDictionary());
-            Status("Ready: hold Ctrl+Win to dictate", toast: true);
+            var progress = new Progress<double>(p => { if (p is > 0 and < 1) Status($"{name}: downloading {p:P0}", toast: true); });
+            if (!_engines.IsReady(language)) Status($"Loading {name}…", toast: true);
+            await _engines.EnsureReadyAsync(language, progress, _exit.Token);
+            Status(language == Language.English ? "Ready: hold Ctrl+Win to dictate" : $"{name} ready: hold Ctrl+Win to dictate", toast: true);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
-            Status("Could not load models: " + e.Message, toast: true);
-            throw;
+            Status($"Could not load {name}: {e.Message}", toast: true);
         }
     }
 
@@ -115,7 +123,7 @@ public partial class App : Application
 
     // ---- audio, controller ---------------------------------------------------------------------------------------
 
-    private void StartAudioAndController(Task ready)
+    private void StartAudioAndController()
     {
         _mic = new WaveInMic();
         var recorder = new Recorder(_mic, new PreRoll(16000, 500));
@@ -126,7 +134,8 @@ public partial class App : Application
         }
         _clipboard = new Win32Clipboard(_overlay.Handle);
         _controller = new DictationController(recorder, audio => _pipeline!.Run(audio, Tone.Casual),
-            _clipboard, new SendInputPaster(), FocusProbe.Get, ready, TimeSpan.FromMilliseconds(150));
+            _clipboard, new SendInputPaster(), FocusProbe.Get,
+            () => _engines.EnsureReadyAsync(Languages.Parse(_settings.Language)), TimeSpan.FromMilliseconds(150));
 
         _mic.Samples += _controller.PushLevel;
         _controller.Level += rms => Dispatcher.BeginInvoke(() => _overlay.PushLevel(rms));
@@ -162,6 +171,20 @@ public partial class App : Application
         {
             _startup.Set(!_startup.IsEnabled(), Environment.ProcessPath!);
             _tray.SetStartupChecked(_startup.IsEnabled());
+        };
+        _tray.LanguageSelected += language =>
+        {
+            _settings.Language = Languages.Code(language);
+            _settings.Save();
+            _router.Current = language;
+            _tray.SetLanguageChecked(language);
+            _ = PrepareLanguageAsync(language);
+        };
+        _tray.ToggleRoman += () =>
+        {
+            _settings.RomanOutput = !_settings.RomanOutput;
+            _settings.Save();
+            _tray.SetRomanChecked(_settings.RomanOutput);
         };
         _tray.OpenDictionary += () => Shell(AppPaths.Dictionary);
         _tray.OpenModels += () => { Directory.CreateDirectory(AppPaths.Models); Shell(AppPaths.Models); };
@@ -241,6 +264,8 @@ public partial class App : Application
         _hook?.Dispose();
         _mic?.Dispose();
         _watcher?.Dispose();
+        _engines?.Dispose();
+        _http?.Dispose();
         _tray?.Dispose();
         _clipboard?.Dispose();
         try { _controller?.Dispose(); } catch (AggregateException) { }

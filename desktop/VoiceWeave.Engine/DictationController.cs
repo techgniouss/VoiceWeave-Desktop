@@ -17,7 +17,7 @@ public sealed class DictationController : IDisposable
     private readonly IClipboard _clipboard;
     private readonly IPaster _paster;
     private readonly Func<FocusInfo> _focus;
-    private readonly Task _ready;
+    private readonly Func<Task> _ready;
     private readonly TimeSpan _restoreDelay;
     private readonly Channel<float[]> _jobs = Channel.CreateUnbounded<float[]>();
     private readonly object _gate = new();
@@ -34,7 +34,7 @@ public sealed class DictationController : IDisposable
     public event Action<PipelineResult, TimeSpan>? Pasted;
 
     public DictationController(Recorder recorder, Func<float[], PipelineResult> run, IClipboard clipboard, IPaster paster,
-        Func<FocusInfo> focus, Task ready, TimeSpan restoreDelay)
+        Func<FocusInfo> focus, Func<Task> ready, TimeSpan restoreDelay)
     {
         _recorder = recorder;
         _run = run;
@@ -126,7 +126,7 @@ public sealed class DictationController : IDisposable
             var started = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                await _ready;
+                await _ready(); // evaluated per utterance, so a language switched to a moment ago is waited for
                 var result = await Task.Run(() => _run(audio));
                 if (result.Final.Length == 0)
                 {

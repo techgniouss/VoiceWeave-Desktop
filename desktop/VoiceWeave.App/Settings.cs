@@ -19,6 +19,12 @@ public sealed class Settings
     public double? BarLeft { get; set; }
     public double? BarTop { get; set; }
 
+    /// <summary>Spoken language: en, te, hi or ta.</summary>
+    public string Language { get; set; } = "en";
+
+    /// <summary>Write Telugu, Hindi and Tamil in English letters ("nenu repu") instead of their own script.</summary>
+    public bool RomanOutput { get; set; } = true;
+
     public static Settings Load()
     {
         try { return JsonSerializer.Deserialize<Settings>(File.ReadAllText(AppPaths.SettingsFile)) ?? new Settings(); }

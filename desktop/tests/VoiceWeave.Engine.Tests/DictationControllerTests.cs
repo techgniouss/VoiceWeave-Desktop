@@ -48,7 +48,7 @@ public class DictationControllerTests
             recorder.Arm();
             Controller = new DictationController(recorder,
                 a => { Interlocked.Increment(ref RunCalls); return Run(a); },
-                Clip, new FakePaster(Clip), () => Focus, Ready.Task, TimeSpan.Zero);
+                Clip, new FakePaster(Clip), () => Focus, () => Ready.Task, TimeSpan.Zero);
             Controller.Message += m => Messages.Add(m);
             Controller.StateChanged += s => States.Add(s);
         }

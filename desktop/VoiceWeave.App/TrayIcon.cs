@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using VoiceWeave.Engine;
 using Forms = System.Windows.Forms;
 
 namespace VoiceWeave.App;
@@ -8,13 +9,26 @@ namespace VoiceWeave.App;
 sealed class TrayIcon : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
-    private readonly Forms.ToolStripMenuItem _barItem, _startupItem, _statusItem;
+    private readonly Forms.ToolStripMenuItem _barItem, _startupItem, _statusItem, _romanItem;
+    private readonly Dictionary<Language, Forms.ToolStripMenuItem> _languageItems = new();
 
-    public event Action? ToggleBar, ToggleStartup, OpenDictionary, OpenModels, Quit;
+    public event Action? ToggleBar, ToggleStartup, ToggleRoman, OpenDictionary, OpenModels, Quit;
+    public event Action<Language>? LanguageSelected;
 
-    public TrayIcon(bool barVisible, bool startWithWindows)
+    public TrayIcon(bool barVisible, bool startWithWindows, Language language, bool romanOutput)
     {
         _statusItem = new Forms.ToolStripMenuItem("Starting…") { Enabled = false };
+        var languageMenu = new Forms.ToolStripMenuItem("Language");
+        foreach (var l in Languages.All)
+        {
+            var item = new Forms.ToolStripMenuItem(Languages.DisplayName(l)) { Checked = l == language };
+            var chosen = l;
+            item.Click += (_, _) => LanguageSelected?.Invoke(chosen);
+            _languageItems[l] = item;
+            languageMenu.DropDownItems.Add(item);
+        }
+        _romanItem = new Forms.ToolStripMenuItem("Write Indian languages in English letters") { Checked = romanOutput };
+        _romanItem.Click += (_, _) => ToggleRoman?.Invoke();
         _barItem = new Forms.ToolStripMenuItem("Show floating bar") { Checked = barVisible, CheckOnClick = false };
         _startupItem = new Forms.ToolStripMenuItem("Start with Windows") { Checked = startWithWindows };
         var dictionary = new Forms.ToolStripMenuItem("Edit dictionary…");
@@ -29,7 +43,8 @@ sealed class TrayIcon : IDisposable
         var menu = new Forms.ContextMenuStrip();
         menu.Items.AddRange(new Forms.ToolStripItem[]
         {
-            _statusItem, new Forms.ToolStripSeparator(), _barItem, _startupItem, dictionary, models, new Forms.ToolStripSeparator(), quit,
+            _statusItem, new Forms.ToolStripSeparator(), languageMenu, _romanItem, new Forms.ToolStripSeparator(),
+            _barItem, _startupItem, dictionary, models, new Forms.ToolStripSeparator(), quit,
         });
         _icon = new Forms.NotifyIcon { Icon = MakeIcon(), Text = "VoiceWeave", ContextMenuStrip = menu, Visible = true };
         _icon.DoubleClick += (_, _) => ToggleBar?.Invoke();
@@ -41,6 +56,12 @@ sealed class TrayIcon : IDisposable
         _icon.Text = ("VoiceWeave - " + text)[..Math.Min(63, ("VoiceWeave - " + text).Length)]; // tooltip limit is 63 chars
     }
 
+    public void SetLanguageChecked(Language language)
+    {
+        foreach (var (l, item) in _languageItems) item.Checked = l == language;
+    }
+
+    public void SetRomanChecked(bool on) => _romanItem.Checked = on;
     public void SetBarChecked(bool visible) => _barItem.Checked = visible;
     public void SetStartupChecked(bool enabled) => _startupItem.Checked = enabled;
 

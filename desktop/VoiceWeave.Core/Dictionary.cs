@@ -6,7 +6,7 @@ namespace VoiceWeave.Core;
 /// <summary>Personal vocabulary: "heard => preferred" rules, applied exactly then fuzzily.</summary>
 public sealed class Dictionary
 {
-    private static readonly Regex WordRx = new(@"[\p{L}\p{N}'’]+", RegexOptions.Compiled);
+    private static readonly Regex WordRx = new(@"[\p{L}\p{M}\p{N}'’]+", RegexOptions.Compiled); // \p{M}: vowel signs and viramas inside Indic words
 
     private readonly record struct Rule(string[] Heard, string Preferred);
 
