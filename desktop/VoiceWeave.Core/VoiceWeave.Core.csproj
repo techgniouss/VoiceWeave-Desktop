@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\english-words.txt.gz" LogicalName="VoiceWeave.Core.Resources.english-words.txt.gz" />
+  </ItemGroup>
+
 </Project>

@@ -11,6 +11,12 @@ llama.cpp (ggml)            MIT          https://github.com/ggml-org/llama.cpp
 NAudio (Mark Heath)         MIT          https://github.com/naudio/NAudio
 .NET runtime (Microsoft)    MIT          https://github.com/dotnet/runtime
 
+English word list (used to tell English from other languages)
+------------------------------------------------------------
+dwyl/english-words (words_alpha.txt)      Unlicense (public domain)
+    https://github.com/dwyl/english-words
+    Stored compressed inside the app.
+
 Models downloaded on first launch (not part of the installer)
 -------------------------------------------------------------
 Parakeet TDT 0.6B v2 (NVIDIA)             CC-BY-4.0
@@ -24,6 +30,17 @@ Spokenly Cleanup 1 by Spokenly            Apache-2.0
     https://huggingface.co/spokenly/cleanup-1-gguf
     A fine-tune of Qwen3-0.6B-Base (Copyright 2024 Alibaba Cloud, Apache-2.0),
     converted to GGUF with 8-bit weights (Q8_0) by Spokenly.
+
+Whisper-base (OpenAI)                     MIT
+    https://github.com/openai/whisper
+    ONNX int8 export for sherpa-onnx by csukuangfj:
+    https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base
+    Used only to identify the spoken language in the "English + ..." modes.
+
+AI4Bharat IndicConformer (Telugu, Hindi, Tamil)   MIT
+    https://github.com/AI4Bharat/IndicConformer
+    Packs from https://github.com/saeedtechshop/transly-speech-packs and
+    https://huggingface.co/OpenVoiceOS/ai4bharat-indicconformer-hi-onnx
 
 Each model is verified against a pinned SHA-256 hash before it is used.
 

@@ -86,61 +86,120 @@ public class LanguageChooserTests
 
 public class SpeechRouterTests
 {
-    private sealed class NamedAsr(string name) : IAsr
+    private sealed class TextAsr(Func<string> text) : IAsr
     {
         public int Calls;
-        public string Transcribe(float[] pcm) { Calls++; return name; }
+        public string Transcribe(float[] pcm) { Calls++; return text(); }
         public void Dispose() { }
     }
 
     private sealed class FixedLid(params string[] codes) : ILanguageIdentifier
     {
-        private int _i;
-        public string Identify(float[] pcm16k) => codes[Math.Min(_i++, codes.Length - 1)];
+        public int Calls;
+        public string Identify(float[] pcm16k) => codes[Math.Min(Calls++, codes.Length - 1)];
     }
 
     private static float[] Audio(double seconds) => new float[(int)(seconds * 16000)];
 
-    [Fact]
-    public void SingleMode_UsesItsOwnEngine_WithoutLanguageId()
+    // "Quarkus deployed the service": three of four words are English, so the English check alone cannot decide.
+    private const string Uncertain = "Quarkus deployed the service";
+
+    private static (SpeechRouter router, TextAsr english, TextAsr regional) Auto(string englishText, ILanguageIdentifier? lid = null,
+        Func<IReadOnlySet<string>>? known = null)
     {
-        var engines = new Dictionary<Language, NamedAsr> { [Language.Telugu] = new("te-text"), [Language.English] = new("en-text") };
-        var router = new SpeechRouter(l => engines[l], () => null, SpeechMode.Telugu);
-        var seg = router.RecognizeSegment(Audio(2), previous: null);
-        Assert.Equal(new Segment("te-text", Language.Telugu), seg);
-        Assert.Equal(0, engines[Language.English].Calls);
+        var english = new TextAsr(() => englishText);
+        var regional = new TextAsr(() => "నేను రేపు");
+        var router = new SpeechRouter(l => l == Language.English ? english : regional, () => lid, SpeechMode.EnglishTelugu) { KnownTerms = known };
+        return (router, english, regional);
     }
 
     [Fact]
-    public void AutoMode_RoutesEachSegmentByItsLanguage()
+    public void SingleMode_UsesItsOwnEngine_WithoutLanguageIdOrTheEnglishCheck()
     {
-        var engines = new Dictionary<Language, NamedAsr> { [Language.Telugu] = new("te-text"), [Language.English] = new("en-text") };
-        var lid = new FixedLid("en", "te");
-        var router = new SpeechRouter(l => engines[l], () => lid, SpeechMode.EnglishTelugu);
-        Assert.Equal(Language.English, router.RecognizeSegment(Audio(2), null)!.Language);
-        Assert.Equal(Language.Telugu, router.RecognizeSegment(Audio(2), Language.English)!.Language);
+        var english = new TextAsr(() => "en-text");
+        var telugu = new TextAsr(() => "te-text");
+        var router = new SpeechRouter(l => l == Language.English ? english : telugu, () => null, SpeechMode.Telugu);
+        Assert.Equal(new Segment("te-text", Language.Telugu), router.RecognizeSegment(Audio(2), previous: null));
+        Assert.Equal(0, english.Calls);
     }
 
     [Fact]
-    public void AutoMode_WithoutALanguageIdYet_FallsBackToEnglish()
+    public void AutoMode_ClearEnglish_StaysEnglish_AndNeverNeedsLanguageId()
     {
-        var engines = new Dictionary<Language, NamedAsr> { [Language.Telugu] = new("te-text"), [Language.English] = new("en-text") };
-        var router = new SpeechRouter(l => engines[l], () => null, SpeechMode.EnglishTelugu);
+        var lid = new FixedLid("te");
+        var (router, _, regional) = Auto("Please review the pull request after standup.", lid);
         Assert.Equal(Language.English, router.RecognizeSegment(Audio(2), null)!.Language);
+        Assert.Equal(0, lid.Calls);
+        Assert.Equal(0, regional.Calls);
+    }
+
+    [Fact]
+    public void AutoMode_TeluguHeardAsEnglishNonsense_SwitchesToTelugu_WithoutLanguageId()
+    {
+        // the real case: "Em chesthunnav ra" came out as "Aim Chesto naura"
+        var lid = new FixedLid("en");
+        var (router, _, regional) = Auto("Aim Chesto naura", lid);
+        var segment = router.RecognizeSegment(Audio(2), null)!;
+        Assert.Equal(Language.Telugu, segment.Language);
+        Assert.Equal("నేను రేపు", segment.Text);
+        Assert.Equal(1, regional.Calls);
+        Assert.Equal(0, lid.Calls);
+    }
+
+    [Fact]
+    public void AutoMode_EmptyEnglishResult_GoesToTelugu()
+    {
+        var (router, _, _) = Auto("  ");
+        Assert.Equal(Language.Telugu, router.RecognizeSegment(Audio(2), null)!.Language);
+    }
+
+    [Fact]
+    public void AutoMode_UncertainEnglish_IsDecidedByLanguageId()
+    {
+        var (toTelugu, _, _) = Auto(Uncertain, new FixedLid("te"));
+        Assert.Equal(Language.Telugu, toTelugu.RecognizeSegment(Audio(3), null)!.Language);
+        var (toEnglish, _, regional) = Auto(Uncertain, new FixedLid("en"));
+        Assert.Equal(Language.English, toEnglish.RecognizeSegment(Audio(3), null)!.Language);
+        Assert.Equal(0, regional.Calls);
+    }
+
+    [Fact]
+    public void AutoMode_UncertainEnglish_WithoutLanguageId_StaysEnglish()
+    {
+        var (router, _, _) = Auto(Uncertain);
+        Assert.Equal(Language.English, router.RecognizeSegment(Audio(3), null)!.Language);
+    }
+
+    [Fact]
+    public void AutoMode_UserDictionaryTerms_CountAsEnglishWords()
+    {
+        var terms = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Quarkus", "Miyapur" };
+        var (withTerms, _, _) = Auto("Quarkus Miyapur", known: () => terms);
+        Assert.Equal(Language.English, withTerms.RecognizeSegment(Audio(2), null)!.Language);
+        var (without, _, _) = Auto("Quarkus Miyapur");
+        Assert.Equal(Language.Telugu, without.RecognizeSegment(Audio(2), null)!.Language);
+    }
+
+    [Fact]
+    public void AutoMode_VeryShortUncertainSegment_FollowsThePreviousLanguage()
+    {
+        var (router, _, _) = Auto(Uncertain, new FixedLid("en"));
+        Assert.Equal(Language.Telugu, router.RecognizeSegment(Audio(0.6), previous: Language.Telugu)!.Language);
     }
 
     [Fact]
     public void EmptyRecognitionResult_GivesNoSegment()
     {
-        var router = new SpeechRouter(_ => new NamedAsr("  "), () => null, SpeechMode.English);
+        var router = new SpeechRouter(_ => new TextAsr(() => "  "), () => null, SpeechMode.English);
         Assert.Null(router.RecognizeSegment(Audio(2), null));
     }
 
     [Fact]
     public void ModeCanChangeAtRuntime()
     {
-        var engines = new Dictionary<Language, NamedAsr> { [Language.Hindi] = new("hi-text"), [Language.English] = new("en-text") };
-        var router = new SpeechRouter(l => engines[l], () => null, SpeechMode.English);
+        var english = new TextAsr(() => "Hello there.");
+        var hindi = new TextAsr(() => "नमस्ते");
+        var router = new SpeechRouter(l => l == Language.English ? english : hindi, () => null, SpeechMode.English);
         Assert.Equal(Language.English, router.RecognizeSegment(Audio(2), null)!.Language);
         router.Mode = SpeechMode.Hindi;
         Assert.Equal(Language.Hindi, router.RecognizeSegment(Audio(2), null)!.Language);

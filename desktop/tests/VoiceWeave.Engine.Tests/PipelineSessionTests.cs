@@ -140,7 +140,8 @@ public class PipelineSessionTests
     public void AutoMode_RoutesEnglishAndTeluguSentencesSeparately_AndJoinsThem()
     {
         var cleaner = new CountingCleaner();
-        var pipeline = Pipeline(new ScriptedAsr(_ => "Hello there."), new CleanupService(cleaner),
+        // the English recogniser hears the second sentence (really Telugu) as nonsense words
+        var pipeline = Pipeline(new ScriptedAsr(n => n == 1 ? "Hello there." : "Aim chesto naura"), new CleanupService(cleaner),
             regional: new ScriptedAsr(_ => "నేను రేపు"), mode: SpeechMode.EnglishTelugu, lid: new FixedLid("en", "te"));
         var session = pipeline.StartSession(VoiceWeave.Engine.Tone.Casual);
         FeedLikeAMic(session, Join(Tone(1.5), Silence(1.0), Tone(1.5)));

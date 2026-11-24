@@ -86,7 +86,11 @@ public partial class App : Application
         _engines = new EngineManager(models, AppPaths.Models, LanguagePacks.For);
         _lid = new LanguageIdManager(models, AppPaths.Models, WhisperLanguageId.Files, dir => new WhisperLanguageId(dir));
         var mode = SpeechModes.Parse(_settings.Language);
-        _router = new SpeechRouter(_engines.Get, () => _lid.Current, mode) { Trace = line => DiagLog.Write("segment: " + line) };
+        _router = new SpeechRouter(_engines.Get, () => _lid.Current, mode)
+        {
+            Trace = line => DiagLog.Write("segment: " + line),
+            KnownTerms = () => _pipeline!.Dictionary.Terms.ToHashSet(StringComparer.OrdinalIgnoreCase),
+        };
         _cleaner = new LlamaCleaner(AppPaths.Models);
         _pipeline = new DictationPipeline(_router, new CleanupService(_cleaner), LoadDictionary())
         {
