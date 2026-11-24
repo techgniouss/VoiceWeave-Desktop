@@ -72,7 +72,12 @@ public sealed class LanguageIdManager(ModelManager models, string modelDir, IRea
             done += spec.Size;
         }
         progress?.Report(1.0);
-        return await Task.Run(() => create(modelDir), ct);
+        return await Task.Run(() =>
+        {
+            var identifier = create(modelDir);
+            identifier.Identify(new float[16000]); // warm-up: the first run is slower than the rest
+            return identifier;
+        }, ct);
     }
 
     public void Dispose()

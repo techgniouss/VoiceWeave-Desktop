@@ -48,7 +48,13 @@ public sealed class EngineManager(ModelManager models, string modelDir, Func<Lan
             done += spec.Size;
         }
         progress?.Report(1.0);
-        return await Task.Run(() => pack.Create(modelDir), ct);
+        return await Task.Run(() =>
+        {
+            var engine = pack.Create(modelDir);
+            // The first run of a freshly loaded model is several times slower than the rest; do it now on silence.
+            engine.Transcribe(new float[16000]);
+            return engine;
+        }, ct);
     }
 
     public void Dispose()

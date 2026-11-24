@@ -92,7 +92,8 @@ public class EngineManagerTests : IDisposable
 
     private sealed class FakeAsr : IAsr
     {
-        public string Transcribe(float[] pcm) => "x";
+        public static int Warmups;
+        public string Transcribe(float[] pcm) { Interlocked.Increment(ref Warmups); return "x"; }
         public void Dispose() { }
     }
 
@@ -120,6 +121,16 @@ public class EngineManagerTests : IDisposable
         Assert.Equal(2, http.Requests);
         Assert.Equal(1, created[0]);
         Assert.NotNull(m.Get(Language.Telugu));
+    }
+
+    [Fact]
+    public async Task LoadingAnEngine_WarmsItUpOnce_SoTheFirstRealSentenceIsNotSlow()
+    {
+        var (m, _, _) = Rig();
+        var before = FakeAsr.Warmups;
+        await m.EnsureReadyAsync(Language.Telugu);
+        await m.EnsureReadyAsync(Language.Telugu);
+        Assert.Equal(1, FakeAsr.Warmups - before);
     }
 
     [Fact]
