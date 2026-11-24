@@ -1,8 +1,8 @@
 namespace VoiceWeave.Core;
 
-public enum KeyEvent { HoldDown, HoldUp, EscDown, OtherKeyDown }
+public enum KeyEvent { HoldDown, HoldUp, EscDown, OtherKeyDown, RegionalDown }
 
-public enum HotkeyAction { None, StartRecording, StopAndTranscribe, Cancel, Latch }
+public enum HotkeyAction { None, StartRecording, StopAndTranscribe, Cancel, Latch, ForceRegional }
 
 /// <summary>Hold-to-talk, quick double-tap to latch hands-free, Esc to cancel, other keys cancel a hold.</summary>
 public sealed class HotkeyMachine(long minHoldMs, long doubleTapMs)
@@ -40,6 +40,8 @@ public sealed class HotkeyMachine(long minHoldMs, long doubleTapMs)
                         _state = State.Idle;
                         _lastShortTapUp = -1;
                         return HotkeyAction.Cancel;
+                    case KeyEvent.RegionalDown:
+                        return HotkeyAction.ForceRegional;
                     default:
                         return HotkeyAction.None; // key auto-repeat
                 }
@@ -61,6 +63,8 @@ public sealed class HotkeyMachine(long minHoldMs, long doubleTapMs)
                         _state = State.Idle;
                         _lastShortTapUp = -1;
                         return HotkeyAction.Cancel;
+                    case KeyEvent.RegionalDown:
+                        return HotkeyAction.ForceRegional;
                     default:
                         return HotkeyAction.None;
                 }
@@ -74,6 +78,8 @@ public sealed class HotkeyMachine(long minHoldMs, long doubleTapMs)
                     case KeyEvent.EscDown:
                         _state = State.Idle;
                         return HotkeyAction.Cancel;
+                    case KeyEvent.RegionalDown:
+                        return HotkeyAction.ForceRegional;
                     default:
                         return HotkeyAction.None;
                 }

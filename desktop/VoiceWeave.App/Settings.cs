@@ -7,7 +7,12 @@ namespace VoiceWeave.App;
 public static class AppPaths
 {
     public static string Root { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VoiceWeave");
-    public static string Models => Environment.GetEnvironmentVariable("VOICEWEAVE_MODELS") is { Length: > 0 } custom ? custom : Path.Combine(Root, "models");
+    /// <summary>A models folder remembered in settings.json; the environment variable still wins when it is set.</summary>
+    public static string? ModelsFolderSetting { get; set; }
+    public static string Models =>
+        Environment.GetEnvironmentVariable("VOICEWEAVE_MODELS") is { Length: > 0 } fromEnvironment ? fromEnvironment
+        : ModelsFolderSetting is { Length: > 0 } fromSettings ? fromSettings
+        : Path.Combine(Root, "models");
     public static string Dictionary => Path.Combine(Root, "dictionary.txt");
     public static string SettingsFile => Path.Combine(Root, "settings.json");
 }
@@ -18,6 +23,9 @@ public sealed class Settings
     public bool BarVisible { get; set; } = true;
     public double? BarLeft { get; set; }
     public double? BarTop { get; set; }
+
+    /// <summary>Where the speech models live, if not the default folder under %LOCALAPPDATA%\VoiceWeave\models.</summary>
+    public string? ModelsFolder { get; set; }
 
     /// <summary>Spoken language: en, te, hi or ta.</summary>
     public string Language { get; set; } = "en";

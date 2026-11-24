@@ -188,6 +188,27 @@ public class SpeechRouterTests
     }
 
     [Fact]
+    public void AutoMode_ForcedRegional_GoesStraightToTelugu_EvenWhenTheEnglishWordsLookFine()
+    {
+        // "Em chesthunnav" heard by the English model as the real words "Aim just to know"
+        var lid = new FixedLid("en");
+        var (router, english, regional) = Auto("Aim just to know", lid);
+        var segment = router.RecognizeSegment(Audio(1), previous: null, forceRegional: true)!;
+        Assert.Equal(Language.Telugu, segment.Language);
+        Assert.Equal(0, english.Calls);
+        Assert.Equal(0, lid.Calls);
+        Assert.Equal(1, regional.Calls);
+    }
+
+    [Fact]
+    public void SingleMode_IgnoresForceRegional()
+    {
+        var english = new TextAsr(() => "Hello there.");
+        var router = new SpeechRouter(_ => english, () => null, SpeechMode.English);
+        Assert.Equal(Language.English, router.RecognizeSegment(Audio(1), null, forceRegional: true)!.Language);
+    }
+
+    [Fact]
     public void EmptyRecognitionResult_GivesNoSegment()
     {
         var router = new SpeechRouter(_ => new TextAsr(() => "  "), () => null, SpeechMode.English);

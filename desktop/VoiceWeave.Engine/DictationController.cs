@@ -30,6 +30,8 @@ public sealed class DictationController : IDisposable
     public event Action<DictationState>? StateChanged;
     public event Action<string>? Message;
     public event Action<float>? Level;
+    /// <summary>Raised when the user asked for the regional language for the dictation in progress.</summary>
+    public event Action? RegionalForced;
     /// <summary>Raised after a successful paste with the stage results and the key-release-to-pasted time.</summary>
     public event Action<PipelineResult, TimeSpan>? Pasted;
 
@@ -64,6 +66,16 @@ public sealed class DictationController : IDisposable
             _latched = latched;
         }
         Raise();
+    }
+
+    /// <summary>The user asked (Shift held) for the regional language for this dictation.</summary>
+    public void ForceRegional()
+    {
+        PipelineSession? session;
+        lock (_gate) session = _recording ? _session : null;
+        if (session == null) return;
+        if (!session.ForceRegional()) return; // already forced: the key is only repeating
+        RegionalForced?.Invoke();
     }
 
     /// <summary>Turns a held recording into a hands-free one (the key can be released).</summary>

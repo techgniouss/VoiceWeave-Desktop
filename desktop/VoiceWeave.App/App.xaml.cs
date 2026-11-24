@@ -58,6 +58,7 @@ public partial class App : Application
         };
 
         _settings = Settings.Load();
+        AppPaths.ModelsFolderSetting = _settings.ModelsFolder;
         Directory.CreateDirectory(AppPaths.Root);
         DiagLog.Write($"started v{typeof(App).Assembly.GetName().Version}; language={_settings.Language} roman={_settings.RomanOutput}; models={AppPaths.Models}");
         if (!File.Exists(AppPaths.Dictionary)) File.WriteAllText(AppPaths.Dictionary, DefaultDictionary);
@@ -167,6 +168,13 @@ public partial class App : Application
 
         _mic.Samples += _controller.PushLevel;
         _controller.Level += rms => Dispatcher.BeginInvoke(() => _overlay.PushLevel(rms));
+        _controller.RegionalForced += () =>
+        {
+            var partner = SpeechModes.Partner(_router.Mode);
+            if (partner == null) return;
+            DiagLog.Write("regional language forced");
+            Dispatcher.BeginInvoke(() => _overlay.ShowToast($"{Languages.DisplayName(partner.Value)} (Shift held)", 2000));
+        };
         _controller.StateChanged += state => DiagLog.Write($"state: {state}");
         _controller.StateChanged += state => Dispatcher.BeginInvoke(() => _overlay.SetState(state, _controller.IsLatched));
         _controller.Message += text => DiagLog.Write("message: " + text);
@@ -266,6 +274,7 @@ public partial class App : Application
                     case HotkeyAction.StartRecording: _controller.Begin(latched: false); break;
                     case HotkeyAction.StopAndTranscribe: _controller.Finish(); break;
                     case HotkeyAction.Cancel: _controller.Cancel(); break;
+                    case HotkeyAction.ForceRegional: _controller.ForceRegional(); break;
                     case HotkeyAction.Latch:
                         _controller.Latch();
                         await Dispatcher.BeginInvoke(() => _overlay.SetState(DictationState.Recording, latched: true));

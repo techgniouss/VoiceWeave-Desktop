@@ -41,13 +41,13 @@ public sealed class DictationPipeline(SpeechRouter router, CleanupService cleanu
         return session.Finish();
     }
 
-    internal Piece? Process(float[] audio, Tone tone, Language? previous)
+    internal Piece? Process(float[] audio, Tone tone, Language? previous, bool forceRegional = false)
     {
         if (audio.Length < MinSeconds * SampleRate || Peak(audio) < SilencePeak) return null;
         lock (EngineGate)
         {
             var sw = Stopwatch.StartNew();
-            var segment = router.RecognizeSegment(audio, previous);
+            var segment = router.RecognizeSegment(audio, previous, forceRegional);
             var asrTime = sw.Elapsed;
             if (segment == null) return null;
 
@@ -85,6 +85,7 @@ public sealed class PipelineSession
     private readonly object _gate = new();
     private Exception? _error;
     private volatile bool _cancelled;
+    private volatile bool _forceRegional;
     private bool _finished;
 
     internal PipelineSession(DictationPipeline owner, Tone tone, Func<Task> ready)
@@ -129,6 +130,18 @@ public sealed class PipelineSession
             TimeSpan.FromTicks(pieces.Sum(p => p.CleanupTime.Ticks)));
     }
 
+    /// <summary>
+    /// The user said this dictation is in the regional language: sentences recognised from now on skip the English guess.
+    /// (Has no effect in the single-language modes.)
+    /// </summary>
+    /// <returns>True the first time it is called for this dictation (holding Shift repeats the key).</returns>
+    public bool ForceRegional()
+    {
+        var first = !_forceRegional;
+        _forceRegional = true;
+        return first;
+    }
+
     /// <summary>Abandons the dictation: nothing more is recognised.</summary>
     public void Cancel()
     {
@@ -145,7 +158,7 @@ public sealed class PipelineSession
             try
             {
                 await _ready();
-                var piece = _owner.Process(audio, _tone, previous);
+                var piece = _owner.Process(audio, _tone, previous, _forceRegional);
                 if (piece == null) continue;
                 _pieces.Add(piece);
                 previous = piece.Language;

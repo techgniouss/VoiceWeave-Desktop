@@ -51,14 +51,16 @@ public class DictationControllerTests
         public readonly List<DictationState> States = new();
         public readonly TaskCompletionSource Ready = new();
         public readonly ScriptedAsr Asr;
+        public int RegionalCalls;
         public FocusInfo Focus = new(false, false, false, "");
         public readonly DictationController Controller;
 
-        public Rig(Func<int, string>? text = null, bool ready = true)
+        public Rig(Func<int, string>? text = null, bool ready = true, SpeechMode mode = SpeechMode.English)
         {
             if (ready) Ready.SetResult();
             Asr = new ScriptedAsr(text ?? (_ => "Hello there."));
-            var pipeline = new DictationPipeline(new SpeechRouter(_ => Asr, () => null, SpeechMode.English),
+            var regional = new ScriptedAsr(_ => { RegionalCalls++; return "ఏం చేస్తున్నావ్"; });
+            var pipeline = new DictationPipeline(new SpeechRouter(l => l == Language.English ? Asr : regional, () => null, mode),
                 new CleanupService(new PassThroughCleaner()), CoreDictionary.Parse(""));
             var recorder = new Recorder(Audio, new PreRoll(16000, 500));
             recorder.Arm();
@@ -189,6 +191,31 @@ public class DictationControllerTests
         rig.Controller.Finish();
         await rig.Controller.WaitUntilIdleAsync();
         Assert.Equal(new[] { "Sentence 1. Sentence 2. Sentence 3." }, rig.Clip.Pasted);
+    }
+
+    [Fact]
+    public async Task ForceRegional_ReachesTheSession_AndIsAnnounced()
+    {
+        var rig = new Rig(mode: SpeechMode.EnglishTelugu);
+        var forced = 0;
+        rig.Controller.RegionalForced += () => forced++;
+        rig.Controller.Begin(false);
+        rig.Controller.ForceRegional();
+        rig.Audio.Emit(16000);
+        rig.Controller.Finish();
+        await rig.Controller.WaitUntilIdleAsync();
+        Assert.Equal(1, forced);
+        Assert.Equal(1, rig.RegionalCalls);   // went to the regional engine despite plausible English text
+    }
+
+    [Fact]
+    public void ForceRegional_WhenNotRecording_DoesNothing()
+    {
+        var rig = new Rig(mode: SpeechMode.EnglishTelugu);
+        var forced = 0;
+        rig.Controller.RegionalForced += () => forced++;
+        rig.Controller.ForceRegional();
+        Assert.Equal(0, forced);
     }
 
     [Fact]

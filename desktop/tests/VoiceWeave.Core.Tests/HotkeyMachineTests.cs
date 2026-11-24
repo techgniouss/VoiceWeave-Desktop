@@ -50,6 +50,31 @@ public class HotkeyMachineTests
     }
 
     [Fact]
+    public void RegionalDuringAHold_ForcesTheRegionalLanguage_AndKeepsRecording()
+    {
+        var m = New();
+        m.On(KeyEvent.HoldDown, 0);
+        Assert.Equal(HotkeyAction.ForceRegional, m.On(KeyEvent.RegionalDown, 100));
+        Assert.Equal(HotkeyAction.StopAndTranscribe, m.On(KeyEvent.HoldUp, 1000));
+    }
+
+    [Fact]
+    public void RegionalDuringHandsFree_AlsoForces()
+    {
+        var m = New();
+        m.On(KeyEvent.HoldDown, 0);
+        m.On(KeyEvent.HoldUp, 100);
+        m.On(KeyEvent.HoldDown, 250);
+        m.On(KeyEvent.HoldUp, 330);   // latched
+        Assert.Equal(HotkeyAction.ForceRegional, m.On(KeyEvent.RegionalDown, 600));
+        Assert.Equal(HotkeyAction.StopAndTranscribe, m.On(KeyEvent.HoldDown, 5000));
+    }
+
+    [Fact]
+    public void RegionalWhileIdle_DoesNothing() =>
+        Assert.Equal(HotkeyAction.None, New().On(KeyEvent.RegionalDown, 0));
+
+    [Fact]
     public void KeyEventsWhileIdle_DoNothing()
     {
         var m = New();

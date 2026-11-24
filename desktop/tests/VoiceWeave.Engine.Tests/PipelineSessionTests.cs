@@ -150,6 +150,20 @@ public class PipelineSessionTests
     }
 
     [Fact]
+    public void ForceRegional_SendsTheSentenceToTelugu_EvenIfEnglishLooksFine()
+    {
+        var english = new ScriptedAsr(_ => "Aim just to know");
+        var pipeline = Pipeline(english, new CleanupService(new CountingCleaner()),
+            regional: new ScriptedAsr(_ => "ఏం చేస్తున్నావ్"), mode: SpeechMode.EnglishTelugu, lid: new FixedLid("en"));
+        var session = pipeline.StartSession(VoiceWeave.Engine.Tone.Casual);
+        session.ForceRegional();
+        FeedLikeAMic(session, Tone(1.5));
+        var result = session.Finish();
+        Assert.Equal("em chestunnaav", result.Final);
+        Assert.Equal(0, english.Calls);
+    }
+
+    [Fact]
     public void WaitsForTheModelsBeforeRecognising_ThenCompletes()
     {
         var gate = new TaskCompletionSource();

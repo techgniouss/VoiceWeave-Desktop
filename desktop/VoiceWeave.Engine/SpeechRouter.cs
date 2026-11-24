@@ -58,7 +58,7 @@ public sealed class SpeechRouter(Func<Language, IAsr> engines, Func<ILanguageIde
 
     /// <param name="previous">The language of the stretch before this one, if any (used when this one is too short to judge).</param>
     /// <returns>The recognised text, or null when nothing was recognised.</returns>
-    public Segment? RecognizeSegment(float[] pcm16k, Language? previous)
+    public Segment? RecognizeSegment(float[] pcm16k, Language? previous, bool forceRegional = false)
     {
         var mode = Mode;
         var seconds = pcm16k.Length / 16000.0;
@@ -70,6 +70,14 @@ public sealed class SpeechRouter(Func<Language, IAsr> engines, Func<ILanguageIde
             var single = engines(only).Transcribe(pcm16k).Trim();
             Trace?.Invoke($"{seconds:F1}s of speech: {only} recognition {clock.Elapsed.TotalSeconds:F2}s");
             return single.Length == 0 ? null : new Segment(single, only);
+        }
+
+        if (forceRegional)
+        {
+            // The user said which language this is (Shift held): no guessing.
+            var forced = engines(partner).Transcribe(pcm16k).Trim();
+            Trace?.Invoke($"{seconds:F1}s of speech: forced {partner}, recognition {clock.Elapsed.TotalSeconds:F2}s");
+            return forced.Length == 0 ? null : new Segment(forced, partner);
         }
 
         var english = engines(Language.English).Transcribe(pcm16k).Trim();

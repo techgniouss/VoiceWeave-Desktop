@@ -59,8 +59,31 @@ public class ChordTrackerTests
         var c = new ChordTracker();
         c.On(LCtrl, true);
         c.On(LWin, true);
+        Assert.Equal(KeyEvent.OtherKeyDown, c.On(KeyA, true));
+        Assert.Null(c.On(KeyA, false));
+    }
+
+    [Theory]
+    [InlineData(0x10u)]   // Shift
+    [InlineData(0xA0u)]   // left Shift
+    [InlineData(0xA1u)]   // right Shift
+    public void ShiftDuringChord_RequestsTheRegionalLanguage_WithoutCancelling(uint shift)
+    {
+        var c = new ChordTracker();
+        c.On(LCtrl, true);
+        c.On(LWin, true);
+        Assert.Equal(KeyEvent.RegionalDown, c.On(shift, true));
+        Assert.Null(c.On(shift, false));
+        Assert.Equal(KeyEvent.HoldUp, c.On(LWin, false)); // the hold is still intact
+    }
+
+    [Fact]
+    public void ShiftOutsideTheChord_IsJustAnotherKey()
+    {
+        var c = new ChordTracker();
         Assert.Equal(KeyEvent.OtherKeyDown, c.On(Shift, true));
-        Assert.Null(c.On(Shift, false));
+        c.On(LCtrl, true);
+        Assert.Equal(KeyEvent.OtherKeyDown, c.On(Shift, true)); // Ctrl+Shift alone is a normal shortcut
     }
 
     [Fact]

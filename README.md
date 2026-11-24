@@ -19,6 +19,7 @@ It installs for your user only (no administrator prompt) and does **not** start 
 - It does not type into password fields or windows running as administrator, and tells you so.
 - **Tray icon**: show or hide the bar, Start with Windows, edit your dictionary, open the models folder, quit.
 - **Languages**: tray icon, **Language**: English, Telugu, Hindi or Tamil, or **English + Telugu / Hindi / Tamil (auto)**, which detects the language of each sentence so you can switch between them with a pause (about 160 MB extra for language detection, downloaded the first time). The Telugu, Hindi and Tamil models (about 140-190 MB each) download the first time you pick them. By default those languages are typed in **English letters** ("nenu repu udayam Hyderabad veltunnanu"); untick *Write Indian languages in English letters* in the tray menu to get Telugu, Devanagari or Tamil script instead.
+- **Telugu / Hindi / Tamil missed in auto mode?** Hold **Shift** as well (Ctrl+Win+Shift) and that dictation goes straight to the regional language. Language detection cannot always tell a short phrase like "Em chesthunnav" from English.
 - **Long dictation**: sentences are recognised while you speak (at each pause), so the wait after you stop stays short however long you talked.
 - **Dictionary**: add words it mishears, one per line, as `what it hears => what you want` (for example `quark us => Quarkus`).
 
