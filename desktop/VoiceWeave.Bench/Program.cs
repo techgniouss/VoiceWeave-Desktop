@@ -7,11 +7,12 @@ if (args.Length >= 2 && args[0] == "llama-probe")
     await LlamaProbe.Run(args[1]);
     return 0;
 }
+if (args.Length >= 1 && args[0] == "dictate") return await DictateCommand.Run(args);
 if (args.Length >= 1 && args[0] == "mic-test") return await WinChecks.MicTest();
 if (args.Length >= 1 && args[0] == "hook-test") return await WinChecks.HookTest();
 if (args.Length >= 1 && args[0] == "focus-test") return WinChecks.FocusTest();
 if (args.Length >= 1 && args[0] == "paste-test") return await WinChecks.PasteTest();
-Console.WriteLine("usage: bench llama-probe <model.gguf> | mic-test | hook-test | focus-test | paste-test");
+Console.WriteLine("usage: bench llama-probe <model.gguf> | mic-test | hook-test | focus-test | paste-test | dictate --models <dir> [--dict <file>]");
 return 1;
 
 static class LlamaProbe
