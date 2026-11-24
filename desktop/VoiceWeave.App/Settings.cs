@@ -50,6 +50,9 @@ public sealed class Settings
     /// <summary>Write Telugu, Hindi and Tamil in English letters ("nenu repu") instead of their own script.</summary>
     public bool RomanOutput { get; set; } = true;
 
+    /// <summary>Look for a newer release on GitHub at start-up and every few hours. Nothing installs without a click.</summary>
+    public bool AutoUpdate { get; set; } = true;
+
     public static Settings Load()
     {
         try { return JsonSerializer.Deserialize<Settings>(File.ReadAllText(AppPaths.SettingsFile)) ?? new Settings(); }

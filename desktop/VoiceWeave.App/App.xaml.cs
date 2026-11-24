@@ -46,10 +46,21 @@ public partial class App : Application
     public SpeechMode Mode => _router.Mode;
     public bool StartupEnabled => _startup.IsEnabled();
 
+    /// <summary>A newer release found on GitHub, or null.</summary>
+    public UpdateInfo? Update { get; private set; }
+    /// <summary>What the update area should say: checking, up to date, downloading 42%, failed…</summary>
+    public string UpdateStatus { get; private set; } = "";
+    public bool UpdateBusy { get; private set; }
+    public static Version CurrentVersion { get; } = typeof(App).Assembly.GetName().Version ?? new Version(0, 0);
+    /// <summary>An unversioned build from source (1.0.0.0) never offers updates.</summary>
+    public static bool IsDevelopmentBuild => CurrentVersion == new Version(1, 0, 0, 0);
+
     /// <summary>The status line changed (loading, downloading, ready…).</summary>
     public event Action? StatusChanged;
     /// <summary>A setting changed from the tray or the window, so every view should refresh.</summary>
     public event Action? SettingsChanged;
+    /// <summary>The update state (found, checking, downloading, failed) changed.</summary>
+    public event Action? UpdateChanged;
     /// <summary>A dictation finished and was added to the history (if history is on).</summary>
     public event Action<HistoryEntry>? Dictated;
 
@@ -94,6 +105,7 @@ public partial class App : Application
         StartHotkey();
         WatchDictionary();
         WatchForSecondLaunch();
+        StartUpdateLoop();
 
         // Started by hand: show the window. Started at sign-in (--background) it stays in the tray, except the very first time.
         var background = e.Args.Contains("--background");
@@ -169,6 +181,13 @@ public partial class App : Application
         SettingsChanged?.Invoke();
     }
 
+    public void SetAutoUpdate(bool on)
+    {
+        _settings.AutoUpdate = on;
+        _settings.Save();
+        SettingsChanged?.Invoke();
+    }
+
     public void SetKeepHistory(bool on)
     {
         _settings.KeepHistory = on;
@@ -196,6 +215,92 @@ public partial class App : Application
     {
         var retention = _settings.HistoryDays > 0 ? TimeSpan.FromDays(_settings.HistoryDays) : (TimeSpan?)null;
         History = new HistoryStore(AppPaths.History, 1000, retention);
+    }
+
+    // ---- updates ---------------------------------------------------------------------------------------------------
+
+    private static string UpdateFolder => Path.Combine(AppPaths.Root, "updates");
+
+    private void SetUpdateState(string status, bool busy)
+    {
+        UpdateStatus = status;
+        UpdateBusy = busy;
+        UpdateChanged?.Invoke();
+    }
+
+    /// <summary>Checks GitHub shortly after start and then every six hours (if the user has not turned that off).</summary>
+    private void StartUpdateLoop()
+    {
+        if (IsDevelopmentBuild) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                try { if (Directory.Exists(UpdateFolder)) Directory.Delete(UpdateFolder, true); } catch (IOException) { } // leftovers of an earlier update
+                await Task.Delay(TimeSpan.FromSeconds(30), _exit.Token);
+                while (!_exit.IsCancellationRequested)
+                {
+                    if (_settings.AutoUpdate) await Dispatcher.InvokeAsync(() => CheckForUpdateAsync(manual: false)).Task.Unwrap();
+                    await Task.Delay(TimeSpan.FromHours(6), _exit.Token);
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+    }
+
+    /// <summary>Asks GitHub whether a newer version exists. A manual check says so when there is none; an automatic one stays quiet.</summary>
+    public async Task CheckForUpdateAsync(bool manual)
+    {
+        if (UpdateBusy) return;
+        if (IsDevelopmentBuild)
+        {
+            if (manual) SetUpdateState("This is a development build, so it does not check for updates.", false);
+            return;
+        }
+        SetUpdateState("Checking for updates…", true);
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_exit.Token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(20));
+            using var http = new System.Net.Http.HttpClient();
+            var found = await new UpdateChecker(http).CheckAsync(CurrentVersion, timeout.Token);
+            var isNew = found != null && found.Version != Update?.Version;
+            Update = found;
+            SetUpdateState(found != null ? $"Version {found.Version} is available." : manual ? "You are up to date." : "", false);
+            if (found != null) DiagLog.Write($"update available: {found.Version}");
+            if (isNew && !manual) _tray.ShowBalloon("VoiceWeave update available", $"Version {found!.Version} is ready. Open VoiceWeave to install it.");
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !_exit.IsCancellationRequested)
+        {
+            DiagLog.Write("update check failed: " + e.Message);
+            SetUpdateState(manual ? "Could not check for updates. Try again later." : "", false);
+        }
+    }
+
+    /// <summary>Downloads the update, checks it, starts the installer and closes this copy so the installer can replace the files.</summary>
+    public async Task InstallUpdateAsync()
+    {
+        var info = Update;
+        if (info == null || UpdateBusy) return;
+        SetUpdateState("Downloading 0%", true);
+        try
+        {
+            using var http = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            var progress = new Progress<double>(p => SetUpdateState($"Downloading {p:P0}", true));
+            var installer = await new UpdateChecker(http).DownloadAsync(info, UpdateFolder, progress, _exit.Token);
+            SetUpdateState("Installing…", true);
+            DiagLog.Write($"starting installer for {info.Version}");
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(installer, "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS")
+            {
+                UseShellExecute = true,
+            });
+            Shutdown(); // the installer starts the new version when it is done
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            DiagLog.Write("update failed: " + e.Message);
+            SetUpdateState("The update could not be installed: " + e.Message, false);
+        }
     }
 
     // ---- models and pipeline -------------------------------------------------------------------------------------

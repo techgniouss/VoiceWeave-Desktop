@@ -49,6 +49,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\VoiceWeave.exe"; Description: "Start VoiceWeave now"; Flags: nowait postinstall skipifsilent
+; An update started from inside the app runs silently; bring the new version back up afterwards.
+Filename: "{app}\VoiceWeave.exe"; Flags: nowait runasoriginaluser; Check: WizardSilent
 
 [Code]
 // Downloaded models are large, so ask before deleting them (a silent uninstall keeps them).

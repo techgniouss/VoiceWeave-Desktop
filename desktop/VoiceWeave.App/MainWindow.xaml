@@ -53,6 +53,16 @@
             <!-- HOME -->
             <ScrollViewer x:Name="HomePage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Margin="36,30,36,30" MaxWidth="820" HorizontalAlignment="Stretch">
+                    <Border x:Name="UpdateBanner" Visibility="Collapsed" Background="{StaticResource Mint}" CornerRadius="14" Padding="20,14" Margin="0,0,0,16">
+                        <DockPanel>
+                            <Button x:Name="UpdateInstall" DockPanel.Dock="Right" Content="Update now" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Margin="16,0,0,0" Click="OnInstallUpdate"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="UpdateTitle" Foreground="{StaticResource Ink}" FontWeight="SemiBold" FontSize="14.5"/>
+                                <TextBlock x:Name="UpdateDetail" Foreground="{StaticResource Ink}" Opacity="0.8" FontSize="12.5" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+
                     <Border x:Name="WelcomeCard" Background="{StaticResource Ink}" CornerRadius="18" Padding="28,26" Margin="0,0,0,20" ClipToBounds="True">
                         <Grid>
                             <Canvas Width="280" Height="56" HorizontalAlignment="Right" VerticalAlignment="Top" Opacity="0.9" Margin="0,-6,-6,0">
@@ -214,7 +224,13 @@
                             <TextBlock Text="Off by default. You can also turn it off in Windows Settings, under Apps, Startup." Style="{StaticResource Subtle}" Margin="0,0,0,8"/>
                             <CheckBox x:Name="BarBox" Content="Show the floating bar on screen" Style="{StaticResource Switch}" Click="OnBarClicked"/>
                             <CheckBox x:Name="LearnBox" Content="Learn from my corrections" Style="{StaticResource Switch}" Click="OnLearnClicked"/>
-                            <TextBlock Text="When you fix a misheard word after dictating, it is added to your dictionary." Style="{StaticResource Subtle}"/>
+                            <TextBlock Text="When you fix a misheard word after dictating, it is added to your dictionary." Style="{StaticResource Subtle}" Margin="0,0,0,8"/>
+                            <CheckBox x:Name="AutoUpdateBox" Content="Check for updates automatically" Style="{StaticResource Switch}" Click="OnAutoUpdateClicked"/>
+                            <TextBlock Text="Looks at the project's GitHub releases. Nothing is installed until you click Update now." Style="{StaticResource Subtle}" Margin="0,0,0,8"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="CheckNowButton" Content="Check for updates now" Style="{StaticResource GhostButton}" Click="OnCheckNow"/>
+                                <TextBlock x:Name="UpdateStatusText" Style="{StaticResource Subtle}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 

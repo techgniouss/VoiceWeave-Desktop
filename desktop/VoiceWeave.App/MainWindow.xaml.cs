@@ -32,11 +32,13 @@ public partial class MainWindow : Window
 
         _app.StatusChanged += () => Dispatcher.BeginInvoke(RefreshStatus);
         _app.SettingsChanged += () => Dispatcher.BeginInvoke(RefreshSettings);
+        _app.UpdateChanged += () => Dispatcher.BeginInvoke(RefreshUpdate);
         _app.Dictated += OnDictated;
         if (_app.History != null) _app.History.Changed += OnHistoryChanged;
 
         RefreshStatus();
         RefreshSettings();
+        RefreshUpdate();
         RefreshHistory();
     }
 
@@ -96,6 +98,7 @@ public partial class MainWindow : Window
             BarBox.IsChecked = s.BarVisible;
             LearnBox.IsChecked = s.LearnCorrections;
             KeepHistoryBox.IsChecked = s.KeepHistory;
+            AutoUpdateBox.IsChecked = s.AutoUpdate;
             foreach (ComboBoxItem item in RetentionBox.Items) if ((int)item.Tag == s.HistoryDays) RetentionBox.SelectedItem = item;
             RetentionBox.IsEnabled = s.KeepHistory;
             ModelsPath.Text = AppPaths.Models;
@@ -103,6 +106,24 @@ public partial class MainWindow : Window
         }
         finally { _loading = false; }
     }
+
+    private void RefreshUpdate()
+    {
+        var update = _app.Update;
+        UpdateBanner.Visibility = update != null ? Visibility.Visible : Visibility.Collapsed;
+        if (update != null)
+        {
+            UpdateTitle.Text = $"VoiceWeave {update.Version} is available";
+            UpdateDetail.Text = _app.UpdateBusy ? _app.UpdateStatus : "Installs in a minute and reopens by itself. Your settings, models and history stay.";
+        }
+        UpdateInstall.IsEnabled = !_app.UpdateBusy;
+        CheckNowButton.IsEnabled = !_app.UpdateBusy;
+        UpdateStatusText.Text = _app.UpdateStatus;
+    }
+
+    private void OnInstallUpdate(object sender, RoutedEventArgs e) => _ = _app.InstallUpdateAsync();
+    private void OnCheckNow(object sender, RoutedEventArgs e) => _ = _app.CheckForUpdateAsync(manual: true);
+    private void OnAutoUpdateClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetAutoUpdate(AutoUpdateBox.IsChecked == true); }
 
     private void OnModeChanged(object sender, SelectionChangedEventArgs e)
     {
