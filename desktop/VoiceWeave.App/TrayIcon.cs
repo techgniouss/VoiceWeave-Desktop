@@ -9,14 +9,14 @@ namespace VoiceWeave.App;
 sealed class TrayIcon : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
-    private readonly Forms.ToolStripMenuItem _barItem, _startupItem, _statusItem, _romanItem;
+    private readonly Forms.ToolStripMenuItem _barItem, _startupItem, _statusItem, _romanItem, _learnItem, _undoItem;
     private readonly Dictionary<SpeechMode, Forms.ToolStripMenuItem> _languageItems = new();
     private readonly Forms.ContextMenuStrip _menu = new();
 
-    public event Action? ToggleBar, ToggleStartup, ToggleRoman, OpenDictionary, OpenModels, Quit;
+    public event Action? ToggleBar, ToggleStartup, ToggleRoman, ToggleLearning, UndoLearned, OpenDictionary, OpenModels, Quit;
     public event Action<SpeechMode>? LanguageSelected;
 
-    public TrayIcon(bool barVisible, bool startWithWindows, SpeechMode language, bool romanOutput)
+    public TrayIcon(bool barVisible, bool startWithWindows, SpeechMode language, bool romanOutput, bool learnCorrections)
     {
         _statusItem = new Forms.ToolStripMenuItem("Starting…") { Enabled = false };
         var languageMenu = new Forms.ToolStripMenuItem("Language");
@@ -31,6 +31,10 @@ sealed class TrayIcon : IDisposable
         }
         _romanItem = new Forms.ToolStripMenuItem("Write Indian languages in English letters") { Checked = romanOutput };
         _romanItem.Click += (_, _) => ToggleRoman?.Invoke();
+        _learnItem = new Forms.ToolStripMenuItem("Learn from my corrections") { Checked = learnCorrections };
+        _learnItem.Click += (_, _) => ToggleLearning?.Invoke();
+        _undoItem = new Forms.ToolStripMenuItem("Undo last learned correction") { Enabled = false };
+        _undoItem.Click += (_, _) => UndoLearned?.Invoke();
         _barItem = new Forms.ToolStripMenuItem("Show floating bar") { Checked = barVisible, CheckOnClick = false };
         _startupItem = new Forms.ToolStripMenuItem("Start with Windows") { Checked = startWithWindows };
         var dictionary = new Forms.ToolStripMenuItem("Edit dictionary…");
@@ -45,7 +49,7 @@ sealed class TrayIcon : IDisposable
         var menu = _menu;
         menu.Items.AddRange(new Forms.ToolStripItem[]
         {
-            _statusItem, new Forms.ToolStripSeparator(), languageMenu, _romanItem, new Forms.ToolStripSeparator(),
+            _statusItem, new Forms.ToolStripSeparator(), languageMenu, _romanItem, _learnItem, _undoItem, new Forms.ToolStripSeparator(),
             _barItem, _startupItem, dictionary, models, new Forms.ToolStripSeparator(), quit,
         });
         _icon = new Forms.NotifyIcon { Icon = MakeIcon(), Text = "VoiceWeave", ContextMenuStrip = menu, Visible = true };
@@ -67,6 +71,8 @@ sealed class TrayIcon : IDisposable
     }
 
     public void SetRomanChecked(bool on) => _romanItem.Checked = on;
+    public void SetLearnChecked(bool on) => _learnItem.Checked = on;
+    public void SetUndoEnabled(bool on) => _undoItem.Enabled = on;
     public void SetBarChecked(bool visible) => _barItem.Checked = visible;
     public void SetStartupChecked(bool enabled) => _startupItem.Checked = enabled;
 

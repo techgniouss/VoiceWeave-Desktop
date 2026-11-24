@@ -30,6 +30,9 @@ public sealed class Settings
     /// <summary>Spoken language: en, te, hi or ta.</summary>
     public string Language { get; set; } = "en";
 
+    /// <summary>Add a dictionary rule when the user corrects a word in the text box after a dictation.</summary>
+    public bool LearnCorrections { get; set; } = true;
+
     /// <summary>Write Telugu, Hindi and Tamil in English letters ("nenu repu") instead of their own script.</summary>
     public bool RomanOutput { get; set; } = true;
 

@@ -31,6 +31,7 @@ public partial class App : Application
     private SpeechRouter _router = null!;
     private LanguageIdManager _lid = null!;
     private LlamaCleaner _cleaner = null!;
+    private CorrectionLearner _learner = null!;
     private System.Net.Http.HttpClient? _http;
     private FileSystemWatcher? _watcher;
     private readonly StartupRegistration _startup = new();
@@ -67,7 +68,7 @@ public partial class App : Application
         _overlay.Show();
         if (!_settings.BarVisible) _overlay.Hide();
 
-        _tray = new TrayIcon(_settings.BarVisible, _startup.IsEnabled(), SpeechModes.Parse(_settings.Language), _settings.RomanOutput);
+        _tray = new TrayIcon(_settings.BarVisible, _startup.IsEnabled(), SpeechModes.Parse(_settings.Language), _settings.RomanOutput, _settings.LearnCorrections);
         WireTray();
 
         InitEngines();
@@ -166,6 +167,23 @@ public partial class App : Application
             () => _pipeline!.StartSession(Tone.Casual, () => EnsureModeAsync(SpeechModes.Parse(_settings.Language))),
             _clipboard, new SendInputPaster(), FocusProbe.Get, TimeSpan.FromMilliseconds(150));
 
+        // Self-learning: after a paste, watch that stretch of the text box and turn the user's fixes into dictionary rules.
+        _learner = new CorrectionLearner(UiaFieldText.CaptureFocused, new DictionaryFileStore(), LearnerTiming.Default)
+        {
+            Enabled = _settings.LearnCorrections,
+        };
+        _learner.Learned += message =>
+        {
+            DiagLog.Write("learned a correction");
+            Dispatcher.BeginInvoke(() =>
+            {
+                _overlay.ShowToast(message, 3500);
+                _tray.SetUndoEnabled(_learner.CanUndo);
+            });
+        };
+        _controller.Pasted += (result, _) => _learner.Watch(result.Final);
+        _controller.StateChanged += state => { if (state == DictationState.Recording) _learner.Cancel(); };
+
         _mic.Samples += _controller.PushLevel;
         _controller.Level += rms => Dispatcher.BeginInvoke(() => _overlay.PushLevel(rms));
         _controller.RegionalForced += () =>
@@ -227,6 +245,20 @@ public partial class App : Application
             _settings.RomanOutput = !_settings.RomanOutput;
             _settings.Save();
             _tray.SetRomanChecked(_settings.RomanOutput);
+        };
+        _tray.ToggleLearning += () =>
+        {
+            _settings.LearnCorrections = !_settings.LearnCorrections;
+            _settings.Save();
+            _learner.Enabled = _settings.LearnCorrections;
+            if (!_settings.LearnCorrections) _learner.Cancel();
+            _tray.SetLearnChecked(_settings.LearnCorrections);
+        };
+        _tray.UndoLearned += () =>
+        {
+            var undone = _learner.UndoLast();
+            _tray.SetUndoEnabled(_learner.CanUndo);
+            _overlay.ShowToast(undone ? "Removed the last learned corrections" : "Nothing to undo", 2500);
         };
         _tray.OpenDictionary += () => Shell(AppPaths.Dictionary);
         _tray.OpenModels += () => { Directory.CreateDirectory(AppPaths.Models); Shell(AppPaths.Models); };
@@ -312,6 +344,7 @@ public partial class App : Application
         _watcher?.Dispose();
         _engines?.Dispose();
         _lid?.Dispose();
+        _learner?.Dispose();
         _cleaner?.Dispose();
         _http?.Dispose();
         _tray?.Dispose();

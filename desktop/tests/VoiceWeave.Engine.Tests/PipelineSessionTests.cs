@@ -137,6 +137,17 @@ public class PipelineSessionTests
     }
 
     [Fact]
+    public void RuleLearnedFromRomanisedText_AppliesAfterRomanising()
+    {
+        // the user corrected "haidaraabaad" to "Hyderabad" in the typed text; the rule is in English letters
+        var pipeline = Pipeline(new ScriptedAsr(_ => "unused"), new CleanupService(new CountingCleaner()), "haidaraabaad => Hyderabad",
+            regional: new ScriptedAsr(_ => "నేను హైదరాబాద్ వెళ్తున్నాను"), mode: SpeechMode.Telugu);
+        var session = pipeline.StartSession(VoiceWeave.Engine.Tone.Casual);
+        FeedLikeAMic(session, Tone(2));
+        Assert.Equal("nenu Hyderabad veltunnaanu", session.Finish().Final);
+    }
+
+    [Fact]
     public void AutoMode_RoutesEnglishAndTeluguSentencesSeparately_AndJoinsThem()
     {
         var cleaner = new CountingCleaner();

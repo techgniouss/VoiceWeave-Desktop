@@ -57,7 +57,8 @@ public sealed class DictationPipeline(SpeechRouter router, CleanupService cleanu
             var cleaned = Languages.UsesCleanup(segment.Language) ? cleanup.Run(corrected, tone, Dictionary.Terms) : corrected;
             var cleanupTime = sw.Elapsed;
             router.Trace?.Invoke($"   cleanup {cleanupTime.TotalSeconds:F2}s ({segment.Language})");
-            var final = segment.Language != Language.English && RomanOutput() ? Romanizer.Convert(cleaned) : cleaned;
+            // Rules learned from the user's corrections of typed (romanised) text are in English letters, so apply the dictionary again.
+            var final = segment.Language != Language.English && RomanOutput() ? Dictionary.Apply(Romanizer.Convert(cleaned)) : cleaned;
             return new Piece(segment.Language, segment.Text, corrected, final.Trim(), asrTime, cleanupTime);
         }
     }
