@@ -19,6 +19,9 @@ public sealed class Recorder(IAudioSource source, PreRoll preRoll)
     private bool _armed;
     private bool _recording;
 
+    /// <summary>Raised with the audio of the current utterance as it arrives (first the pre-roll, then each new piece).</summary>
+    public event Action<float[]>? UtteranceSamples;
+
     public void Arm()
     {
         lock (_gate)
@@ -45,12 +48,15 @@ public sealed class Recorder(IAudioSource source, PreRoll preRoll)
 
     public void BeginUtterance()
     {
+        float[] lead;
         lock (_gate)
         {
             _utterance.Clear();
-            _utterance.AddRange(preRoll.Take());
+            lead = preRoll.Take();
+            _utterance.AddRange(lead);
             _recording = true;
         }
+        if (lead.Length > 0) UtteranceSamples?.Invoke(lead);
     }
 
     public float[] EndUtterance()
@@ -78,11 +84,14 @@ public sealed class Recorder(IAudioSource source, PreRoll preRoll)
 
     private void OnSamples(float[] samples)
     {
+        bool recording;
         lock (_gate)
         {
             if (!_armed) return;
-            if (_recording) _utterance.AddRange(samples);
+            recording = _recording;
+            if (recording) _utterance.AddRange(samples);
             else preRoll.Push(samples);
         }
+        if (recording) UtteranceSamples?.Invoke(samples);
     }
 }

@@ -1,5 +1,6 @@
 using VoiceWeave.Core;
 using VoiceWeave.Engine;
+using CoreDictionary = VoiceWeave.Core.Dictionary;
 
 namespace VoiceWeave.Engine.Tests;
 
@@ -29,26 +30,40 @@ public class DictationControllerTests
         public void CtrlV(bool terminal) => cb.Pasted.Add(cb.Text ?? "");
     }
 
+    private sealed class ScriptedAsr(Func<int, string> text) : IAsr
+    {
+        public int Calls;
+        public string Transcribe(float[] pcm) => text(Interlocked.Increment(ref Calls));
+        public void Dispose() { }
+    }
+
+    private sealed class PassThroughCleaner : ICleaner
+    {
+        public string Clean(string text, Tone tone) => text;
+        public void Dispose() { }
+    }
+
     private sealed class Rig
     {
         public readonly FakeAudio Audio = new();
         public readonly FakeClipboard Clip = new();
         public readonly List<string> Messages = new();
         public readonly List<DictationState> States = new();
-        public TaskCompletionSource Ready = new();
-        public Func<float[], PipelineResult> Run = a => new PipelineResult("raw", "raw", "Hello there.", default, default);
+        public readonly TaskCompletionSource Ready = new();
+        public readonly ScriptedAsr Asr;
         public FocusInfo Focus = new(false, false, false, "");
-        public int RunCalls;
         public readonly DictationController Controller;
 
-        public Rig(bool ready = true)
+        public Rig(Func<int, string>? text = null, bool ready = true)
         {
             if (ready) Ready.SetResult();
+            Asr = new ScriptedAsr(text ?? (_ => "Hello there."));
+            var pipeline = new DictationPipeline(new SpeechRouter(_ => Asr, () => null, SpeechMode.English),
+                new CleanupService(new PassThroughCleaner()), CoreDictionary.Parse(""));
             var recorder = new Recorder(Audio, new PreRoll(16000, 500));
             recorder.Arm();
-            Controller = new DictationController(recorder,
-                a => { Interlocked.Increment(ref RunCalls); return Run(a); },
-                Clip, new FakePaster(Clip), () => Focus, () => Ready.Task, TimeSpan.Zero);
+            Controller = new DictationController(recorder, () => pipeline.StartSession(Tone.Casual, () => Ready.Task),
+                Clip, new FakePaster(Clip), () => Focus, TimeSpan.Zero);
             Controller.Message += m => Messages.Add(m);
             Controller.StateChanged += s => States.Add(s);
         }
@@ -103,7 +118,7 @@ public class DictationControllerTests
         var rig = new Rig();
         await rig.Speak(c => c.Begin(false), c => c.Cancel());
         Assert.Empty(rig.Clip.Pasted);
-        Assert.Equal(0, rig.RunCalls);
+        Assert.Equal(0, rig.Asr.Calls);
         Assert.Equal(DictationState.Idle, rig.Controller.State);
     }
 
@@ -113,7 +128,7 @@ public class DictationControllerTests
         var rig = new Rig();
         rig.Controller.Finish();
         await rig.Controller.WaitUntilIdleAsync();
-        Assert.Equal(0, rig.RunCalls);
+        Assert.Equal(0, rig.Asr.Calls);
     }
 
     [Fact]
@@ -136,7 +151,7 @@ public class DictationControllerTests
         rig.Controller.Begin(false);
         rig.Audio.Emit(16000);
         rig.Controller.Finish();
-        await Task.Delay(100);
+        await Task.Delay(150);
         Assert.Empty(rig.Clip.Pasted);
         Assert.Equal(DictationState.Processing, rig.Controller.State);
         rig.Ready.SetResult();
@@ -147,9 +162,7 @@ public class DictationControllerTests
     [Fact]
     public async Task TwoUtterances_ArePastedInOrder()
     {
-        var rig = new Rig();
-        var n = 0;
-        rig.Run = _ => new PipelineResult("r", "r", $"Text {++n}.", default, default);
+        var rig = new Rig(text: n => $"Text {n}.");
         for (var i = 0; i < 2; i++)
         {
             rig.Controller.Begin(false);
@@ -161,10 +174,27 @@ public class DictationControllerTests
     }
 
     [Fact]
+    public async Task LongDialogue_IsRecognisedWhileSpeaking_SoOnlyTheLastSentenceIsLeftOnRelease()
+    {
+        var rig = new Rig(text: n => $"Sentence {n}.");
+        rig.Controller.Begin(false);
+        // three sentences of speech separated by pauses, fed like a microphone (100 ms pieces)
+        for (var sentence = 0; sentence < 3; sentence++)
+        {
+            for (var i = 0; i < 15; i++) rig.Audio.Emit(1600);                          // 1.5 s of speech
+            if (sentence < 2) for (var i = 0; i < 10; i++) rig.Audio.Emit(1600, 0f);   // 1 s of silence
+        }
+        SpinWait.SpinUntil(() => rig.Asr.Calls >= 2, TimeSpan.FromSeconds(3));
+        Assert.True(rig.Asr.Calls >= 2, "the first sentences should be recognised before the key is released");
+        rig.Controller.Finish();
+        await rig.Controller.WaitUntilIdleAsync();
+        Assert.Equal(new[] { "Sentence 1. Sentence 2. Sentence 3." }, rig.Clip.Pasted);
+    }
+
+    [Fact]
     public async Task NothingHeard_ShowsMessage_NoPaste()
     {
-        var rig = new Rig();
-        rig.Run = _ => new PipelineResult("", "", "", default, default);
+        var rig = new Rig(text: _ => "");
         await rig.Speak(c => c.Begin(false), c => c.Finish());
         Assert.Empty(rig.Clip.Pasted);
         Assert.Contains(rig.Messages, m => m.Contains("catch"));
@@ -191,11 +221,7 @@ public class DictationControllerTests
     [Fact]
     public async Task PipelineThrows_ShowsError_AndNextUtteranceStillWorks()
     {
-        var rig = new Rig();
-        var calls = 0;
-        rig.Run = _ => ++calls == 1
-            ? throw new InvalidOperationException("boom")
-            : new PipelineResult("r", "r", "Worked.", default, default);
+        var rig = new Rig(text: n => n == 1 ? throw new InvalidOperationException("boom") : "Worked.");
         await rig.Speak(c => c.Begin(false), c => c.Finish());
         Assert.Contains(rig.Messages, m => m.Contains("wrong", StringComparison.OrdinalIgnoreCase));
         await rig.Speak(c => c.Begin(false), c => c.Finish());

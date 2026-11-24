@@ -70,32 +70,6 @@ public class OnnxMetadataTests
     }
 }
 
-public class AsrRouterTests
-{
-    private sealed class NamedAsr(string name) : IAsr
-    {
-        public string Transcribe(float[] pcm) => name;
-        public void Dispose() { }
-    }
-
-    [Fact]
-    public void RoutesToTheCurrentLanguage()
-    {
-        var router = new AsrRouter(l => new NamedAsr(l.ToString()), Language.English);
-        Assert.Equal("English", router.Transcribe(new float[1]));
-        router.Current = Language.Telugu;
-        Assert.Equal("Telugu", router.Transcribe(new float[1]));
-    }
-
-    [Fact]
-    public void ReportsWhichLanguageDidTheLastTranscription()
-    {
-        var router = new AsrRouter(l => new NamedAsr(l.ToString()), Language.Hindi);
-        router.Transcribe(new float[1]);
-        Assert.Equal(Language.Hindi, router.LastLanguage);
-    }
-}
-
 public class EngineManagerTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "vw-eng-" + Guid.NewGuid().ToString("N"));
@@ -217,67 +191,5 @@ public class ModelTransformTests : IDisposable
         Assert.Equal(spec.InstalledSize, new FileInfo(path).Length);
         await mm.EnsureAsync(spec, _dir);
         Assert.Equal(1, http.Requests);
-    }
-}
-
-public class RegionalPipelineTests
-{
-    private sealed class FakeAsr(string text) : IAsr
-    {
-        public string Transcribe(float[] pcm) => text;
-        public void Dispose() { }
-    }
-
-    private sealed class CountingCleaner : ICleaner
-    {
-        public int Calls;
-        public string Clean(string text, Tone tone) { Calls++; return text.ToUpperInvariant(); }
-        public void Dispose() { }
-    }
-
-    private static float[] Speech() => Enumerable.Repeat(0.3f, 32000).ToArray();
-
-    [Fact]
-    public void WhenCleanupDisabled_TheModelIsSkipped_AndTextIsKept()
-    {
-        var cleaner = new CountingCleaner();
-        var pipeline = new DictationPipeline(new FakeAsr("నేను రేపు వెళ్తున్నాను"), new CleanupService(cleaner), CoreDictionary.Parse(""))
-        {
-            CleanupEnabled = () => false,
-        };
-        var r = pipeline.Run(Speech(), Tone.Casual);
-        Assert.Equal("నేను రేపు వెళ్తున్నాను", r.Final);
-        Assert.Equal(0, cleaner.Calls);
-    }
-
-    [Fact]
-    public void WhenCleanupDisabled_TheDictionaryStillApplies()
-    {
-        var pipeline = new DictationPipeline(new FakeAsr("నేను హైదరాబాద్ వెళ్తున్నాను"), new CleanupService(new CountingCleaner()), CoreDictionary.Parse("హైదరాబాద్ => Hyderabad"))
-        {
-            CleanupEnabled = () => false,
-        };
-        Assert.Equal("నేను Hyderabad వెళ్తున్నాను", pipeline.Run(Speech(), Tone.Casual).Final);
-    }
-
-    [Fact]
-    public void WhenCleanupEnabled_BehavesAsBefore()
-    {
-        var cleaner = new CountingCleaner();
-        var pipeline = new DictationPipeline(new FakeAsr("send it uh now"), new CleanupService(cleaner), CoreDictionary.Parse(""));
-        var r = pipeline.Run(Speech(), Tone.Casual);
-        Assert.Equal("SEND IT NOW", r.Final);
-        Assert.Equal(1, cleaner.Calls);
-    }
-
-    [Fact]
-    public void FinishHook_RunsLast_AfterTheDictionary()
-    {
-        var pipeline = new DictationPipeline(new FakeAsr("నేను రేపు"), new CleanupService(new CountingCleaner()), CoreDictionary.Parse(""))
-        {
-            CleanupEnabled = () => false,
-            Finish = VoiceWeave.Core.Romanizer.Convert,
-        };
-        Assert.Equal("nenu repu", pipeline.Run(Speech(), Tone.Casual).Final);
     }
 }

@@ -13,15 +13,15 @@ public enum DictationState { Idle, Recording, Processing }
 public sealed class DictationController : IDisposable
 {
     private readonly Recorder _recorder;
-    private readonly Func<float[], PipelineResult> _run;
+    private readonly Func<PipelineSession> _newSession;
     private readonly IClipboard _clipboard;
     private readonly IPaster _paster;
     private readonly Func<FocusInfo> _focus;
-    private readonly Func<Task> _ready;
     private readonly TimeSpan _restoreDelay;
-    private readonly Channel<float[]> _jobs = Channel.CreateUnbounded<float[]>();
+    private readonly Channel<PipelineSession> _jobs = Channel.CreateUnbounded<PipelineSession>();
     private readonly object _gate = new();
     private readonly Task _worker;
+    private PipelineSession? _session;
     private bool _recording;
     private bool _latched;
     private int _pending;
@@ -33,16 +33,16 @@ public sealed class DictationController : IDisposable
     /// <summary>Raised after a successful paste with the stage results and the key-release-to-pasted time.</summary>
     public event Action<PipelineResult, TimeSpan>? Pasted;
 
-    public DictationController(Recorder recorder, Func<float[], PipelineResult> run, IClipboard clipboard, IPaster paster,
-        Func<FocusInfo> focus, Func<Task> ready, TimeSpan restoreDelay)
+    public DictationController(Recorder recorder, Func<PipelineSession> newSession, IClipboard clipboard, IPaster paster,
+        Func<FocusInfo> focus, TimeSpan restoreDelay)
     {
         _recorder = recorder;
-        _run = run;
+        _newSession = newSession;
         _clipboard = clipboard;
         _paster = paster;
         _focus = focus;
-        _ready = ready;
         _restoreDelay = restoreDelay;
+        _recorder.UtteranceSamples += OnUtteranceSamples;
         _worker = Task.Run(WorkAsync);
     }
 
@@ -58,6 +58,7 @@ public sealed class DictationController : IDisposable
         lock (_gate)
         {
             if (_recording) return;
+            _session = _newSession();           // before the recorder starts, so the pre-roll audio reaches it too
             _recorder.BeginUtterance();
             _recording = true;
             _latched = latched;
@@ -77,6 +78,8 @@ public sealed class DictationController : IDisposable
         {
             if (!_recording) return;
             _recorder.Cancel();
+            _session?.Cancel();
+            _session = null;
             _recording = false;
             _latched = false;
         }
@@ -85,16 +88,18 @@ public sealed class DictationController : IDisposable
 
     public void Finish()
     {
-        float[] audio;
+        PipelineSession session;
         lock (_gate)
         {
             if (!_recording) return;
-            audio = _recorder.EndUtterance();
+            _recorder.EndUtterance();           // the session already has the audio; this just stops collecting
+            session = _session!;
+            _session = null;
             _recording = false;
             _latched = false;
             _pending++;
         }
-        _jobs.Writer.TryWrite(audio);
+        _jobs.Writer.TryWrite(session);
         Raise();
     }
 
@@ -119,15 +124,17 @@ public sealed class DictationController : IDisposable
         }
     }
 
+    private void OnUtteranceSamples(float[] samples) => _session?.Feed(samples);
+
     private async Task WorkAsync()
     {
-        await foreach (var audio in _jobs.Reader.ReadAllAsync())
+        await foreach (var session in _jobs.Reader.ReadAllAsync())
         {
             var started = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                await _ready(); // evaluated per utterance, so a language switched to a moment ago is waited for
-                var result = await Task.Run(() => _run(audio));
+                // Most of the work was done while the user was speaking; this waits for the last sentence.
+                var result = await Task.Run(session.Finish);
                 if (result.Final.Length == 0)
                 {
                     Message?.Invoke("Didn't catch that");
@@ -174,6 +181,7 @@ public sealed class DictationController : IDisposable
 
     public void Dispose()
     {
+        _recorder.UtteranceSamples -= OnUtteranceSamples;
         _jobs.Writer.TryComplete();
         try { _worker.Wait(1000); } catch (AggregateException) { }
     }

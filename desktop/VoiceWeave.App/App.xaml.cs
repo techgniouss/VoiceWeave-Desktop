@@ -28,7 +28,9 @@ public partial class App : Application
     private DictationController _controller = null!;
     private DictationPipeline? _pipeline;
     private EngineManager _engines = null!;
-    private AsrRouter _router = null!;
+    private SpeechRouter _router = null!;
+    private LanguageIdManager _lid = null!;
+    private LlamaCleaner _cleaner = null!;
     private System.Net.Http.HttpClient? _http;
     private FileSystemWatcher? _watcher;
     private readonly StartupRegistration _startup = new();
@@ -64,7 +66,7 @@ public partial class App : Application
         _overlay.Show();
         if (!_settings.BarVisible) _overlay.Hide();
 
-        _tray = new TrayIcon(_settings.BarVisible, _startup.IsEnabled(), Languages.Parse(_settings.Language), _settings.RomanOutput);
+        _tray = new TrayIcon(_settings.BarVisible, _startup.IsEnabled(), SpeechModes.Parse(_settings.Language), _settings.RomanOutput);
         WireTray();
 
         InitEngines();
@@ -80,33 +82,50 @@ public partial class App : Application
     private void InitEngines()
     {
         _http = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-        _engines = new EngineManager(new ModelManager(_http), AppPaths.Models, LanguagePacks.For);
-        var language = Languages.Parse(_settings.Language);
-        _router = new AsrRouter(_engines.Get, language);
-        _pipeline = new DictationPipeline(_router, new CleanupService(new LlamaCleaner(AppPaths.Models)), LoadDictionary())
+        var models = new ModelManager(_http);
+        _engines = new EngineManager(models, AppPaths.Models, LanguagePacks.For);
+        _lid = new LanguageIdManager(models, AppPaths.Models, WhisperLanguageId.Files, dir => new WhisperLanguageId(dir));
+        var mode = SpeechModes.Parse(_settings.Language);
+        _router = new SpeechRouter(_engines.Get, () => _lid.Current, mode);
+        _cleaner = new LlamaCleaner(AppPaths.Models);
+        _pipeline = new DictationPipeline(_router, new CleanupService(_cleaner), LoadDictionary())
         {
-            // The cleanup model only understands English; regional text keeps what the recogniser wrote, plus the dictionary.
-            CleanupEnabled = () => Languages.UsesCleanup(_router.LastLanguage),
-            Finish = text => _settings.RomanOutput && _router.LastLanguage != Language.English ? Romanizer.Convert(text) : text,
+            RomanOutput = () => _settings.RomanOutput,
         };
-        _ = PrepareLanguageAsync(language);
+        _ = PrepareModeAsync(mode);
     }
 
-    /// <summary>Downloads (first time only) and loads a language's models, telling the user how it is going.</summary>
-    private async Task PrepareLanguageAsync(Language language)
+    /// <summary>Loads everything a speech mode needs: each language's recogniser, plus language detection for the auto modes.</summary>
+    private async Task EnsureModeAsync(SpeechMode mode, IProgress<double>? progress = null)
     {
-        var name = Languages.DisplayName(language);
+        foreach (var language in SpeechModes.Needs(mode)) await _engines.EnsureReadyAsync(language, progress, _exit.Token);
+        if (SpeechModes.IsAuto(mode)) await _lid.EnsureReadyAsync(progress, _exit.Token);
+    }
+
+    /// <summary>Downloads (first time only) and loads a mode's models, telling the user how it is going.</summary>
+    private async Task PrepareModeAsync(SpeechMode mode)
+    {
+        var name = SpeechModes.DisplayName(mode);
         try
         {
             var progress = new Progress<double>(p => { if (p is > 0 and < 1) Status($"{name}: downloading {p:P0}", toast: true); });
-            if (!_engines.IsReady(language)) Status($"Loading {name}…", toast: true);
-            await _engines.EnsureReadyAsync(language, progress, _exit.Token);
-            Status(language == Language.English ? "Ready: hold Ctrl+Win to dictate" : $"{name} ready: hold Ctrl+Win to dictate", toast: true);
+            var loaded = SpeechModes.Needs(mode).All(_engines.IsReady) && (!SpeechModes.IsAuto(mode) || _lid.Current != null);
+            if (!loaded) Status($"Loading {name}…", toast: true);
+            await EnsureModeAsync(mode, progress);
+            if (SpeechModes.Needs(mode).Contains(Language.English)) _ = Task.Run(WarmCleanup);
+            Status(mode == SpeechMode.English ? "Ready: hold Ctrl+Win to dictate" : $"{name} ready: hold Ctrl+Win to dictate", toast: true);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             Status($"Could not load {name}: {e.Message}", toast: true);
         }
+    }
+
+    /// <summary>Loads the cleanup model now (a few seconds) so the first sentence that needs it is not delayed.</summary>
+    private void WarmCleanup()
+    {
+        try { _cleaner.Clean("um hello", Tone.Casual); DiagLog.Write("cleanup model warmed up"); }
+        catch (Exception e) { DiagLog.Write("cleanup warm-up failed: " + e.Message); }
     }
 
     private static CoreDictionary LoadDictionary()
@@ -137,9 +156,10 @@ public partial class App : Application
             Status("No microphone available: " + e.Message, toast: true);
         }
         _clipboard = new Win32Clipboard(_overlay.Handle);
-        _controller = new DictationController(recorder, audio => _pipeline!.Run(audio, Tone.Casual),
-            _clipboard, new SendInputPaster(), FocusProbe.Get,
-            () => _engines.EnsureReadyAsync(Languages.Parse(_settings.Language)), TimeSpan.FromMilliseconds(150));
+        // Each dictation gets a session that recognises sentences while you are still speaking.
+        _controller = new DictationController(recorder,
+            () => _pipeline!.StartSession(Tone.Casual, () => EnsureModeAsync(SpeechModes.Parse(_settings.Language))),
+            _clipboard, new SendInputPaster(), FocusProbe.Get, TimeSpan.FromMilliseconds(150));
 
         _mic.Samples += _controller.PushLevel;
         _controller.Level += rms => Dispatcher.BeginInvoke(() => _overlay.PushLevel(rms));
@@ -148,7 +168,7 @@ public partial class App : Application
         _controller.Message += text => DiagLog.Write("message: " + text);
         _controller.Message += text => Dispatcher.BeginInvoke(() => _overlay.ShowToast(text, 3500));
         _controller.Pasted += (r, total) => DiagLog.Write(
-            $"pasted ({_router.LastLanguage}): {r.Final.Length} chars, total {total.TotalSeconds:F2}s (speech {r.AsrTime.TotalSeconds:F2}s, cleanup {r.CleanupTime.TotalSeconds:F2}s)");
+            $"pasted ({SpeechModes.Code(_router.Mode)}): {r.Final.Length} chars, total {total.TotalSeconds:F2}s (speech {r.AsrTime.TotalSeconds:F2}s, cleanup {r.CleanupTime.TotalSeconds:F2}s)");
         _controller.Pasted += (r, total) => Dispatcher.BeginInvoke(() =>
             _tray.SetStatus($"Last: {total.TotalSeconds:F1}s (speech {r.AsrTime.TotalSeconds:F1}s, cleanup {r.CleanupTime.TotalSeconds:F1}s)"));
     }
@@ -181,14 +201,14 @@ public partial class App : Application
             _startup.Set(!_startup.IsEnabled(), Environment.ProcessPath!);
             _tray.SetStartupChecked(_startup.IsEnabled());
         };
-        _tray.LanguageSelected += language =>
+        _tray.LanguageSelected += mode =>
         {
-            DiagLog.Write("language selected: " + language);
-            _settings.Language = Languages.Code(language);
+            DiagLog.Write("language selected: " + mode);
+            _settings.Language = SpeechModes.Code(mode);
             _settings.Save();
-            _router.Current = language;
-            _tray.SetLanguageChecked(language);
-            _ = PrepareLanguageAsync(language);
+            _router.Mode = mode;
+            _tray.SetLanguageChecked(mode);
+            _ = PrepareModeAsync(mode);
         };
         _tray.ToggleRoman += () =>
         {
@@ -278,6 +298,8 @@ public partial class App : Application
         _mic?.Dispose();
         _watcher?.Dispose();
         _engines?.Dispose();
+        _lid?.Dispose();
+        _cleaner?.Dispose();
         _http?.Dispose();
         _tray?.Dispose();
         _clipboard?.Dispose();

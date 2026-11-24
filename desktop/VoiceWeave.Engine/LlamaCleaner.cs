@@ -25,7 +25,7 @@ public sealed class LlamaCleaner : ICleaner
     {
         _modelPath = Path.Combine(modelDir, File.Name);
         _threads = threads;
-        _idleUnload = idleUnload ?? TimeSpan.FromMinutes(5);
+        _idleUnload = idleUnload ?? TimeSpan.FromMinutes(20);
     }
 
     public static string BuildPrompt(string text, Tone tone)

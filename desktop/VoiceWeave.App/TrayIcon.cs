@@ -10,19 +10,20 @@ sealed class TrayIcon : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
     private readonly Forms.ToolStripMenuItem _barItem, _startupItem, _statusItem, _romanItem;
-    private readonly Dictionary<Language, Forms.ToolStripMenuItem> _languageItems = new();
+    private readonly Dictionary<SpeechMode, Forms.ToolStripMenuItem> _languageItems = new();
     private readonly Forms.ContextMenuStrip _menu = new();
 
     public event Action? ToggleBar, ToggleStartup, ToggleRoman, OpenDictionary, OpenModels, Quit;
-    public event Action<Language>? LanguageSelected;
+    public event Action<SpeechMode>? LanguageSelected;
 
-    public TrayIcon(bool barVisible, bool startWithWindows, Language language, bool romanOutput)
+    public TrayIcon(bool barVisible, bool startWithWindows, SpeechMode language, bool romanOutput)
     {
         _statusItem = new Forms.ToolStripMenuItem("Starting…") { Enabled = false };
         var languageMenu = new Forms.ToolStripMenuItem("Language");
-        foreach (var l in Languages.All)
+        foreach (var l in SpeechModes.All)
         {
-            var item = new Forms.ToolStripMenuItem(Languages.DisplayName(l)) { Checked = l == language };
+            if (SpeechModes.IsAuto(l) && l == SpeechMode.EnglishTelugu) languageMenu.DropDownItems.Add(new Forms.ToolStripSeparator());
+            var item = new Forms.ToolStripMenuItem(SpeechModes.DisplayName(l)) { Checked = l == language };
             var chosen = l;
             item.Click += (_, _) => LanguageSelected?.Invoke(chosen);
             _languageItems[l] = item;
@@ -60,7 +61,7 @@ sealed class TrayIcon : IDisposable
         _icon.Text = ("VoiceWeave - " + text)[..Math.Min(63, ("VoiceWeave - " + text).Length)]; // tooltip limit is 63 chars
     }
 
-    public void SetLanguageChecked(Language language)
+    public void SetLanguageChecked(SpeechMode language)
     {
         foreach (var (l, item) in _languageItems) item.Checked = l == language;
     }

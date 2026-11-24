@@ -22,7 +22,7 @@ static class DictateCommand
         Console.WriteLine("Loading speech model (about 15 s)...");
         using var asr = new Parakeet(models);
         using var cleaner = new LlamaCleaner(models);
-        var pipeline = new DictationPipeline(asr, new CleanupService(cleaner), CoreDictionary.Parse(dictText));
+        var pipeline = new DictationPipeline(new SpeechRouter(_ => asr, () => null, SpeechMode.English), new CleanupService(cleaner), CoreDictionary.Parse(dictText));
 
         using var mic = new WaveInMic();
         var recorder = new Recorder(mic, new PreRoll(16000, 500));
