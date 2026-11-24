@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+*.onnx
+*.gguf
+*.wav
+*.pem
+*.key
+*.pfx
+*.snk
+.env*
+!.env.example
+models/
+recordings/
+wispr-analysis/

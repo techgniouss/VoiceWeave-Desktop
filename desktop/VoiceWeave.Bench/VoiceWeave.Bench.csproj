@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VoiceWeave.Core\VoiceWeave.Core.csproj" />
+    <ProjectReference Include="..\VoiceWeave.Win\VoiceWeave.Win.csproj" />
+    <ProjectReference Include="..\VoiceWeave.Engine\VoiceWeave.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LLamaSharp" Version="0.30.0" />
+    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.30.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

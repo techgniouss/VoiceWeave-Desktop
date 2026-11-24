@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/VoiceWeave.Core.Tests/VoiceWeave.Core.Tests.csproj" />
+    <Project Path="tests/VoiceWeave.Engine.Tests/VoiceWeave.Engine.Tests.csproj" />
+    <Project Path="tests/VoiceWeave.Win.Tests/VoiceWeave.Win.Tests.csproj" />
+  </Folder>
+  <Project Path="VoiceWeave.App/VoiceWeave.App.csproj" />
+  <Project Path="VoiceWeave.Bench/VoiceWeave.Bench.csproj" />
+  <Project Path="VoiceWeave.Core/VoiceWeave.Core.csproj" />
+  <Project Path="VoiceWeave.Engine/VoiceWeave.Engine.csproj" />
+  <Project Path="VoiceWeave.Win/VoiceWeave.Win.csproj" />
+</Solution>

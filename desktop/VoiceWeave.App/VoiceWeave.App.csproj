@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VoiceWeave.Core\VoiceWeave.Core.csproj" />
+    <ProjectReference Include="..\VoiceWeave.Win\VoiceWeave.Win.csproj" />
+    <ProjectReference Include="..\VoiceWeave.Engine\VoiceWeave.Engine.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>
