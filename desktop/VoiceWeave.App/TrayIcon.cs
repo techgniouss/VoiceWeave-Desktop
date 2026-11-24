@@ -11,6 +11,7 @@ sealed class TrayIcon : IDisposable
     private readonly Forms.NotifyIcon _icon;
     private readonly Forms.ToolStripMenuItem _barItem, _startupItem, _statusItem, _romanItem;
     private readonly Dictionary<Language, Forms.ToolStripMenuItem> _languageItems = new();
+    private readonly Forms.ContextMenuStrip _menu = new();
 
     public event Action? ToggleBar, ToggleStartup, ToggleRoman, OpenDictionary, OpenModels, Quit;
     public event Action<Language>? LanguageSelected;
@@ -40,7 +41,7 @@ sealed class TrayIcon : IDisposable
         models.Click += (_, _) => OpenModels?.Invoke();
         quit.Click += (_, _) => Quit?.Invoke();
 
-        var menu = new Forms.ContextMenuStrip();
+        var menu = _menu;
         menu.Items.AddRange(new Forms.ToolStripItem[]
         {
             _statusItem, new Forms.ToolStripSeparator(), languageMenu, _romanItem, new Forms.ToolStripSeparator(),
@@ -49,6 +50,9 @@ sealed class TrayIcon : IDisposable
         _icon = new Forms.NotifyIcon { Icon = MakeIcon(), Text = "VoiceWeave", ContextMenuStrip = menu, Visible = true };
         _icon.DoubleClick += (_, _) => ToggleBar?.Invoke();
     }
+
+    /// <summary>Shows the tray menu at the mouse pointer (used by right-clicking the floating bar).</summary>
+    public void ShowMenu() => _menu.Show(Forms.Cursor.Position);
 
     public void SetStatus(string text)
     {

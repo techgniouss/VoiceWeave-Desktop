@@ -40,6 +40,8 @@ public partial class OverlayWindow : Window
     public event Action? HoldEnded;
     /// <summary>A quick click: toggles hands-free dictation.</summary>
     public event Action? Clicked;
+    /// <summary>Right-click on the bar: show the same menu as the tray icon.</summary>
+    public event Action? MenuRequested;
 
     public OverlayWindow(Settings settings)
     {
@@ -57,6 +59,7 @@ public partial class OverlayWindow : Window
         Pill.MouseLeftButtonDown += OnDown;
         Pill.MouseMove += OnMove;
         Pill.MouseLeftButtonUp += OnUp;
+        Pill.MouseRightButtonUp += (_, e) => { MenuRequested?.Invoke(); e.Handled = true; };
         Pill.MouseEnter += (_, _) => { if (_state == DictationState.Idle) Pill.Opacity = 1; };
         Pill.MouseLeave += (_, _) => { if (_state == DictationState.Idle) Pill.Opacity = 0.78; };
         SizeChanged += OnSizeChanged;

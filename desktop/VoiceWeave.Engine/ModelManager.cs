@@ -28,8 +28,7 @@ public sealed class ModelManager(HttpClient http)
                  (spec.Transform == null && string.Equals(await HashAsync(final, ct), spec.Sha256, StringComparison.OrdinalIgnoreCase))))
             {
                 await File.WriteAllTextAsync(marker, spec.Sha256, ct);
-                progress?.Report(1);
-                return final;
+                return final; // already installed: no progress to report
             }
             File.Delete(final); // wrong size or contents: fetch again
             if (File.Exists(marker)) File.Delete(marker);

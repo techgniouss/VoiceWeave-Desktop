@@ -157,6 +157,7 @@ public partial class App : Application
 
     private void WireOverlay()
     {
+        _overlay.MenuRequested += () => _tray.ShowMenu();
         _overlay.HoldStarted += () => _controller.Begin(latched: false);
         _overlay.HoldEnded += () => _controller.Finish();
         _overlay.Clicked += () =>
