@@ -1,0 +1,31 @@
+VoiceWeave Desktop - third-party software and models
+
+VoiceWeave itself is released under the MIT licence (see LICENSE).
+
+Software included in the installer
+----------------------------------
+sherpa-onnx (k2-fsa)        Apache-2.0   https://github.com/k2-fsa/sherpa-onnx
+ONNX Runtime (Microsoft)    MIT          https://github.com/microsoft/onnxruntime
+LLamaSharp                  MIT          https://github.com/SciSharp/LLamaSharp
+llama.cpp (ggml)            MIT          https://github.com/ggml-org/llama.cpp
+NAudio (Mark Heath)         MIT          https://github.com/naudio/NAudio
+.NET runtime (Microsoft)    MIT          https://github.com/dotnet/runtime
+
+Models downloaded on first launch (not part of the installer)
+-------------------------------------------------------------
+Parakeet TDT 0.6B v2 (NVIDIA)             CC-BY-4.0
+    https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2
+    ONNX int8 export for sherpa-onnx by csukuangfj:
+    https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8
+    Licensed under Creative Commons Attribution 4.0 (https://creativecommons.org/licenses/by/4.0/).
+    The files are downloaded unchanged and used for speech recognition.
+
+Spokenly Cleanup 1 by Spokenly            Apache-2.0
+    https://huggingface.co/spokenly/cleanup-1-gguf
+    A fine-tune of Qwen3-0.6B-Base (Copyright 2024 Alibaba Cloud, Apache-2.0),
+    converted to GGUF with 8-bit weights (Q8_0) by Spokenly.
+
+Each model is verified against a pinned SHA-256 hash before it is used.
+
+VoiceWeave is an independent project. It is not affiliated with, endorsed by, or derived from the code,
+assets or branding of any commercial dictation product.
