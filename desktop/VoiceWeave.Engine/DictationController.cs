@@ -34,6 +34,8 @@ public sealed class DictationController : IDisposable
     public event Action? RegionalForced;
     /// <summary>Raised after a successful paste with the stage results and the key-release-to-pasted time.</summary>
     public event Action<PipelineResult, TimeSpan>? Pasted;
+    /// <summary>Raised for every dictation that produced text, whatever became of it (pasted, or refused for a password field or admin window).</summary>
+    public event Action<PipelineResult, InsertOutcome, TimeSpan>? Finished;
 
     public DictationController(Recorder recorder, Func<PipelineSession> newSession, IClipboard clipboard, IPaster paster,
         Func<FocusInfo> focus, TimeSpan restoreDelay)
@@ -155,6 +157,7 @@ public sealed class DictationController : IDisposable
                 {
                     var focus = await Task.Run(_focus); // the window we are about to paste into, not the one at key release
                     var outcome = await TextInserter.InsertAsync(_clipboard, _paster, focus, result.Final, _restoreDelay);
+                    Finished?.Invoke(result, outcome, started.Elapsed);
                     switch (outcome)
                     {
                         case InsertOutcome.Pasted: Pasted?.Invoke(result, started.Elapsed); break;

@@ -194,6 +194,41 @@ public class DictationControllerTests
     }
 
     [Fact]
+    public async Task Finished_ReportsEveryOutcome_WithTheText()
+    {
+        var outcomes = new List<(string text, InsertOutcome outcome)>();
+
+        var pasted = new Rig();
+        pasted.Controller.Finished += (r, o, _) => outcomes.Add((r.Final, o));
+        await pasted.Speak(c => c.Begin(false), c => c.Finish());
+
+        var admin = new Rig { Focus = new FocusInfo(false, true, false, "") };
+        admin.Controller.Finished += (r, o, _) => outcomes.Add((r.Final, o));
+        await admin.Speak(c => c.Begin(false), c => c.Finish());
+
+        var password = new Rig { Focus = new FocusInfo(true, false, false, "") };
+        password.Controller.Finished += (r, o, _) => outcomes.Add((r.Final, o));
+        await password.Speak(c => c.Begin(false), c => c.Finish());
+
+        Assert.Equal(new[]
+        {
+            ("Hello there.", InsertOutcome.Pasted),
+            ("Hello there.", InsertOutcome.SkippedElevatedTarget),
+            ("Hello there.", InsertOutcome.SkippedPasswordField),
+        }, outcomes);
+    }
+
+    [Fact]
+    public async Task Finished_IsNotRaisedWhenNothingWasHeard()
+    {
+        var rig = new Rig(text: _ => "");
+        var raised = 0;
+        rig.Controller.Finished += (_, _, _) => raised++;
+        await rig.Speak(c => c.Begin(false), c => c.Finish());
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
     public async Task ForceRegional_ReachesTheSession_AndIsAnnounced()
     {
         var rig = new Rig(mode: SpeechMode.EnglishTelugu);

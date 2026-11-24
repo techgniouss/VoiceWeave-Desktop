@@ -10,9 +10,16 @@
     <AssemblyName>VoiceWeave</AssemblyName>
     <RootNamespace>VoiceWeave.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <!-- English UI only: skip the ~10 translated satellite resource folders. -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\app.png" />
+    <EmbeddedResource Include="Assets\app.ico" LogicalName="VoiceWeave.app.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />

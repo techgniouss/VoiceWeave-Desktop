@@ -14,6 +14,8 @@ It installs for your user only (no administrator prompt) and does **not** start 
 
 ## Use
 
+Opening VoiceWeave shows its window: **Home** (welcome, language, a box to try dictating in), **History** (what you dictated, searchable, copy or delete, kept as text only), **Dictionary** and **Settings**. Closing the window leaves dictation running in the tray.
+
 - **Hold Ctrl+Win**, speak, release. A quick double-tap keeps recording hands-free; tap again to finish. **Esc** cancels.
 - Or use the **floating bar**: press and hold it to dictate, or click once to start and again to finish. Drag it to move it.
 - It does not type into password fields or windows running as administrator, and tells you so.

@@ -13,12 +13,14 @@ sealed class TrayIcon : IDisposable
     private readonly Dictionary<SpeechMode, Forms.ToolStripMenuItem> _languageItems = new();
     private readonly Forms.ContextMenuStrip _menu = new();
 
-    public event Action? ToggleBar, ToggleStartup, ToggleRoman, ToggleLearning, UndoLearned, OpenDictionary, OpenModels, Quit;
+    public event Action? OpenWindow, ToggleBar, ToggleStartup, ToggleRoman, ToggleLearning, UndoLearned, OpenDictionary, OpenModels, Quit;
     public event Action<SpeechMode>? LanguageSelected;
 
     public TrayIcon(bool barVisible, bool startWithWindows, SpeechMode language, bool romanOutput, bool learnCorrections)
     {
         _statusItem = new Forms.ToolStripMenuItem("Starting…") { Enabled = false };
+        var openItem = new Forms.ToolStripMenuItem("Open VoiceWeave") { Font = new Font(Forms.Control.DefaultFont, FontStyle.Bold) };
+        openItem.Click += (_, _) => OpenWindow?.Invoke();
         var languageMenu = new Forms.ToolStripMenuItem("Language");
         foreach (var l in SpeechModes.All)
         {
@@ -49,11 +51,12 @@ sealed class TrayIcon : IDisposable
         var menu = _menu;
         menu.Items.AddRange(new Forms.ToolStripItem[]
         {
-            _statusItem, new Forms.ToolStripSeparator(), languageMenu, _romanItem, _learnItem, _undoItem, new Forms.ToolStripSeparator(),
+            openItem, _statusItem, new Forms.ToolStripSeparator(), languageMenu, _romanItem, _learnItem, _undoItem, new Forms.ToolStripSeparator(),
             _barItem, _startupItem, dictionary, models, new Forms.ToolStripSeparator(), quit,
         });
         _icon = new Forms.NotifyIcon { Icon = MakeIcon(), Text = "VoiceWeave", ContextMenuStrip = menu, Visible = true };
-        _icon.DoubleClick += (_, _) => ToggleBar?.Invoke();
+        _icon.DoubleClick += (_, _) => OpenWindow?.Invoke();
+        _icon.BalloonTipClicked += (_, _) => OpenWindow?.Invoke();
     }
 
     /// <summary>Shows the tray menu at the mouse pointer (used by right-clicking the floating bar).</summary>
@@ -63,6 +66,14 @@ sealed class TrayIcon : IDisposable
     {
         _statusItem.Text = text;
         _icon.Text = ("VoiceWeave - " + text)[..Math.Min(63, ("VoiceWeave - " + text).Length)]; // tooltip limit is 63 chars
+    }
+
+    public void ShowBalloon(string title, string text)
+    {
+        _icon.BalloonTipTitle = title;
+        _icon.BalloonTipText = text;
+        _icon.BalloonTipIcon = Forms.ToolTipIcon.Info;
+        _icon.ShowBalloonTip(5000);
     }
 
     public void SetLanguageChecked(SpeechMode language)
@@ -76,23 +87,11 @@ sealed class TrayIcon : IDisposable
     public void SetBarChecked(bool visible) => _barItem.Checked = visible;
     public void SetStartupChecked(bool enabled) => _startupItem.Checked = enabled;
 
+    /// <summary>The app icon, at the size the notification area wants.</summary>
     private static Icon MakeIcon()
     {
-        using var bmp = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var back = new SolidBrush(Color.FromArgb(255, 28, 28, 32));
-            g.FillEllipse(back, 1, 1, 30, 30);
-            using var white = new SolidBrush(Color.White);
-            using var pen = new Pen(Color.White, 2.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            g.FillRectangle(white, 12, 6, 8, 12);
-            g.FillEllipse(white, 12, 3, 8, 8);
-            g.FillEllipse(white, 12, 13, 8, 8);
-            g.DrawArc(pen, 8, 9, 16, 14, 0, 180);
-            g.DrawLine(pen, 16, 23, 16, 27);
-        }
-        return Icon.FromHandle(bmp.GetHicon());
+        using var stream = typeof(TrayIcon).Assembly.GetManifestResourceStream("VoiceWeave.app.ico")!;
+        return new Icon(stream, Forms.SystemInformation.SmallIconSize);
     }
 
     public void Dispose()

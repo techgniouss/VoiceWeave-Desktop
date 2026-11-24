@@ -49,7 +49,7 @@ public partial class OverlayWindow : Window
         _settings = settings;
         for (var i = 0; i < BarCount; i++)
         {
-            _bars[i] = new Rectangle { Width = 3, Height = 4, RadiusX = 1.5, RadiusY = 1.5, Margin = new Thickness(1.2, 0, 1.2, 0), Fill = new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF7)) };
+            _bars[i] = new Rectangle { Width = 3, Height = 4, RadiusX = 1.5, RadiusY = 1.5, Margin = new Thickness(1.2, 0, 1.2, 0), Fill = new SolidColorBrush(Color.FromRgb(0xA9, 0xF2, 0xCC)) };
             Bars.Children.Add(_bars[i]);
         }
         _holdTimer.Tick += (_, _) => { _holdTimer.Stop(); if (Mouse.LeftButton == MouseButtonState.Pressed) { _holdFired = true; HoldStarted?.Invoke(); } };
@@ -90,8 +90,8 @@ public partial class OverlayWindow : Window
         Bars.Visibility = state == DictationState.Recording ? Visibility.Visible : Visibility.Collapsed;
         Dots.Visibility = state == DictationState.Processing ? Visibility.Visible : Visibility.Collapsed;
         Pill.Opacity = state == DictationState.Idle ? 0.78 : 1;
-        Pill.Background = new SolidColorBrush(state == DictationState.Recording ? Color.FromArgb(0xF2, 0x2A, 0x14, 0x16) : Color.FromArgb(0xE6, 0x1C, 0x1C, 0x20));
-        Pill.BorderBrush = new SolidColorBrush(state == DictationState.Recording ? Color.FromRgb(0xE5, 0x48, 0x4D) : Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
+        Pill.Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x10, 0x28, 0x21));
+        Pill.BorderBrush = new SolidColorBrush(state == DictationState.Recording ? Color.FromRgb(0xF2, 0xCB, 0x8C) : Color.FromArgb(0x55, 0x63, 0xB9, 0x9C));
         Pill.MinWidth = state == DictationState.Recording ? 92 : 34;
         if (state == DictationState.Processing) { Dots.Text = "·"; _dotPhase = 0; _dotsTimer.Start(); } else _dotsTimer.Stop();
         if (state != DictationState.Recording) Array.Clear(_levels);

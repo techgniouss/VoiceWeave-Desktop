@@ -24,6 +24,7 @@ OutputBaseFilename=VoiceWeaveSetup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\VoiceWeave.App\Assets\app.ico
 LicenseFile=..\..\LICENSE
 UninstallDisplayName=VoiceWeave
 UninstallDisplayIcon={app}\VoiceWeave.exe
@@ -31,7 +32,7 @@ CloseApplications=yes
 RestartApplications=no
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a &desktop shortcut"
 
 [Files]
 Source: "..\publish\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion

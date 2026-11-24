@@ -15,6 +15,8 @@ public static class AppPaths
         : Path.Combine(Root, "models");
     public static string Dictionary => Path.Combine(Root, "dictionary.txt");
     public static string SettingsFile => Path.Combine(Root, "settings.json");
+    public static string History => Path.Combine(Root, "history.jsonl");
+    public static string Log => Path.Combine(Root, "log.txt");
 }
 
 /// <summary>Small remembered preferences: whether the floating bar shows and where it sits.</summary>
@@ -29,6 +31,18 @@ public sealed class Settings
 
     /// <summary>Spoken language: en, te, hi or ta.</summary>
     public string Language { get; set; } = "en";
+
+    /// <summary>True once the "still running in the tray" hint has been shown (it is shown only once).</summary>
+    public bool TrayHintShown { get; set; }
+
+    /// <summary>True once the welcome page has been dismissed.</summary>
+    public bool WelcomeDismissed { get; set; }
+
+    /// <summary>Keep a list of past dictations (text only).</summary>
+    public bool KeepHistory { get; set; } = true;
+
+    /// <summary>How many days history is kept; 0 means keep it until the user deletes it.</summary>
+    public int HistoryDays { get; set; } = 30;
 
     /// <summary>Add a dictionary rule when the user corrects a word in the text box after a dictation.</summary>
     public bool LearnCorrections { get; set; } = true;
