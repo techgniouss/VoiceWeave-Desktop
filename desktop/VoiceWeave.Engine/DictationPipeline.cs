@@ -9,6 +9,9 @@ public sealed record PipelineResult(string Raw, string Corrected, string Final, 
 /// <summary>Audio in, clean text out: speech recognition, then the personal dictionary, then cleanup.</summary>
 public sealed class DictationPipeline(IAsr asr, CleanupService cleanup, CoreDictionary dictionary)
 {
+    /// <summary>Replaceable at runtime so edits to the dictionary file apply without a restart.</summary>
+    public CoreDictionary Dictionary { get; set; } = dictionary;
+
     public const int SampleRate = 16000;
     private const double MinSeconds = 0.2;
     private const float SilencePeak = 0.01f;
@@ -23,9 +26,9 @@ public sealed class DictationPipeline(IAsr asr, CleanupService cleanup, CoreDict
         var asrTime = sw.Elapsed;
         if (raw.Length == 0) return empty with { AsrTime = asrTime };
 
-        var corrected = dictionary.Apply(raw);
+        var corrected = Dictionary.Apply(raw);
         sw.Restart();
-        var final = cleanup.Run(corrected, tone, dictionary.Terms);
+        var final = cleanup.Run(corrected, tone, Dictionary.Terms);
         return new PipelineResult(raw, corrected, final, asrTime, sw.Elapsed);
     }
 

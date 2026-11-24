@@ -10,6 +10,8 @@ namespace VoiceWeave.Win;
 /// </summary>
 public sealed class Win32Clipboard : IClipboard, IDisposable
 {
+    private readonly bool _ownsWindow;
+
     private const uint CF_UNICODETEXT = 13;
     private const uint GMEM_MOVEABLE = 0x0002;
 
@@ -18,7 +20,17 @@ public sealed class Win32Clipboard : IClipboard, IDisposable
     private static readonly HashSet<uint> HandleFormats = new() { 2, 3, 9, 14, 0x82, 0x83, 0x8E };
 
     // A message-only window owns the clipboard while we write to it; plain Win32, so it works on any thread.
-    private readonly IntPtr _owner = CreateWindowEx(0, "STATIC", "VoiceWeaveClipboard", 0, 0, 0, 0, 0, new IntPtr(-3), IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+    private readonly IntPtr _owner;
+
+    /// <param name="ownerWindow">An existing window to own the clipboard while writing (the app passes its main window);
+    /// when omitted, a message-only window is created and destroyed with this object.</param>
+    public Win32Clipboard(IntPtr ownerWindow = default)
+    {
+        _ownsWindow = ownerWindow == IntPtr.Zero;
+        _owner = _ownsWindow
+            ? CreateWindowEx(0, "STATIC", "VoiceWeaveClipboard", 0, 0, 0, 0, 0, new IntPtr(-3), IntPtr.Zero, IntPtr.Zero, IntPtr.Zero)
+            : ownerWindow;
+    }
     private readonly uint _fmtExclude = RegisterClipboardFormat("ExcludeClipboardContentFromMonitorProcessing");
     private readonly uint _fmtHistory = RegisterClipboardFormat("CanIncludeInClipboardHistory");
     private readonly uint _fmtCloud = RegisterClipboardFormat("CanUploadToCloudClipboard");
@@ -103,7 +115,7 @@ public sealed class Win32Clipboard : IClipboard, IDisposable
         throw new InvalidOperationException("Could not open the clipboard.");
     }
 
-    public void Dispose() { if (_owner != IntPtr.Zero) DestroyWindow(_owner); }
+    public void Dispose() { if (_ownsWindow && _owner != IntPtr.Zero) DestroyWindow(_owner); }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateWindowEx(uint exStyle, string cls, string name, uint style, int x, int y, int w, int h, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
