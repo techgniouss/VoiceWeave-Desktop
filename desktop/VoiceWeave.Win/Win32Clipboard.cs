@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Windows.Interop;
 using VoiceWeave.Core;
 
 namespace VoiceWeave.Win;
@@ -18,8 +17,8 @@ public sealed class Win32Clipboard : IClipboard, IDisposable
     // the common ones (a bitmap from DIB) so skipping them loses nothing.
     private static readonly HashSet<uint> HandleFormats = new() { 2, 3, 9, 14, 0x82, 0x83, 0x8E };
 
-    private readonly HwndSource _owner =
-        new(new HwndSourceParameters("VoiceWeaveClipboard") { ParentWindow = new IntPtr(-3) }); // message-only window
+    // A message-only window owns the clipboard while we write to it; plain Win32, so it works on any thread.
+    private readonly IntPtr _owner = CreateWindowEx(0, "STATIC", "VoiceWeaveClipboard", 0, 0, 0, 0, 0, new IntPtr(-3), IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
     private readonly uint _fmtExclude = RegisterClipboardFormat("ExcludeClipboardContentFromMonitorProcessing");
     private readonly uint _fmtHistory = RegisterClipboardFormat("CanIncludeInClipboardHistory");
     private readonly uint _fmtCloud = RegisterClipboardFormat("CanUploadToCloudClipboard");
@@ -94,7 +93,7 @@ public sealed class Win32Clipboard : IClipboard, IDisposable
     {
         for (var attempt = 0; attempt < 20; attempt++)
         {
-            if (OpenClipboard(_owner.Handle))
+            if (OpenClipboard(_owner))
             {
                 try { action(); return; }
                 finally { CloseClipboard(); }
@@ -104,8 +103,11 @@ public sealed class Win32Clipboard : IClipboard, IDisposable
         throw new InvalidOperationException("Could not open the clipboard.");
     }
 
-    public void Dispose() => _owner.Dispose();
+    public void Dispose() { if (_owner != IntPtr.Zero) DestroyWindow(_owner); }
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateWindowEx(uint exStyle, string cls, string name, uint style, int x, int y, int w, int h, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
+    [DllImport("user32.dll")] private static extern bool DestroyWindow(IntPtr hwnd);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool OpenClipboard(IntPtr hwnd);
     [DllImport("user32.dll", SetLastError = true)] private static extern bool CloseClipboard();
     [DllImport("user32.dll")] private static extern bool EmptyClipboard();
