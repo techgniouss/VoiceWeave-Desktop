@@ -85,4 +85,14 @@ public class ModelManagerTests : IDisposable
         var path = await mm.EnsureAsync(new ModelSpec("m.bin", "http://x/m.bin", Sha(body), body.Length), _dir);
         Assert.Equal(body, await File.ReadAllBytesAsync(path));
     }
+
+    [Fact]
+    public async Task NameWithSubfolder_CreatesTheFolder()
+    {
+        var body = new byte[] { 1, 2, 3, 4, 5 };
+        var mm = new ModelManager(new HttpClient(new FakeServer(body)));
+        var path = await mm.EnsureAsync(new ModelSpec("parakeet-v2/encoder.int8.onnx", "http://x/m", Sha(body), body.Length), _dir);
+        Assert.Equal(Path.Combine(_dir, "parakeet-v2", "encoder.int8.onnx"), path);
+        Assert.Equal(body, await File.ReadAllBytesAsync(path));
+    }
 }

@@ -12,8 +12,8 @@ public sealed class ModelManager(HttpClient http)
 {
     public async Task<string> EnsureAsync(ModelSpec spec, string dir, IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        Directory.CreateDirectory(dir);
-        var final = Path.Combine(dir, spec.Name);
+        var final = Path.GetFullPath(Path.Combine(dir, spec.Name));
+        Directory.CreateDirectory(Path.GetDirectoryName(final)!); // names can carry a subfolder, e.g. "parakeet-v2/encoder.int8.onnx"
         var marker = final + ".sha256";
         var part = final + ".part";
 
