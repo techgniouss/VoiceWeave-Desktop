@@ -31,7 +31,7 @@ public partial class OverlayWindow : Window
     private readonly DispatcherTimer _dotsTimer = new() { Interval = TimeSpan.FromMilliseconds(260) };
     private DictationState _state = DictationState.Idle;
     private Point _downScreen;
-    private bool _holdFired, _suppressUp;
+    private bool _holdFired, _suppressUp, _shownForToast;
     private int _dotPhase;
 
     /// <summary>The button was pressed and held: start dictating, push-to-talk style.</summary>
@@ -53,7 +53,14 @@ public partial class OverlayWindow : Window
             Bars.Children.Add(_bars[i]);
         }
         _holdTimer.Tick += (_, _) => { _holdTimer.Stop(); if (Mouse.LeftButton == MouseButtonState.Pressed) { _holdFired = true; HoldStarted?.Invoke(); } };
-        _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); Toast.Visibility = Visibility.Collapsed; };
+        _toastTimer.Tick += (_, _) =>
+        {
+            _toastTimer.Stop();
+            Toast.Visibility = Visibility.Collapsed;
+            LearnToast.Visibility = Visibility.Collapsed;
+            if (_shownForToast && !_settings.BarVisible) Hide();
+            _shownForToast = false;
+        };
         _dotsTimer.Tick += (_, _) => { _dotPhase = (_dotPhase + 1) % 4; Dots.Text = new string('·', _dotPhase == 0 ? 1 : _dotPhase); };
 
         Pill.MouseLeftButtonDown += OnDown;
@@ -107,8 +114,24 @@ public partial class OverlayWindow : Window
 
     public void ShowToast(string text, int milliseconds = 2500)
     {
+        LearnToast.Visibility = Visibility.Collapsed;
         ToastText.Text = text;
         Toast.Visibility = Visibility.Visible;
+        StartToastTimer(milliseconds);
+    }
+
+    /// <summary>Tells the user a correction went into the dictionary, e.g. "sri kanth → Srikanth". Shown even if the bar itself is hidden.</summary>
+    public void ShowLearned(string rule, int milliseconds = 6000)
+    {
+        Toast.Visibility = Visibility.Collapsed;
+        LearnToastText.Text = rule;
+        LearnToast.Visibility = Visibility.Visible;
+        StartToastTimer(milliseconds);
+    }
+
+    private void StartToastTimer(int milliseconds)
+    {
+        if (!IsVisible) { _shownForToast = true; Show(); } // the bar is switched off, but a notice still needs somewhere to appear
         _toastTimer.Stop();
         _toastTimer.Interval = TimeSpan.FromMilliseconds(milliseconds);
         _toastTimer.Start();

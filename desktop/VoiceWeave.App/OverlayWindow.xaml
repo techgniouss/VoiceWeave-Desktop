@@ -5,6 +5,24 @@
         ShowInTaskbar="False" Topmost="True" ShowActivated="False" ResizeMode="NoResize"
         SizeToContent="WidthAndHeight" Focusable="False" UseLayoutRounding="True">
     <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+        <!-- shown when a correction was added to the dictionary -->
+        <Border x:Name="LearnToast" Visibility="Collapsed" Background="#F2102821" CornerRadius="12" Padding="12,9"
+                Margin="0,0,0,6" HorizontalAlignment="Center" IsHitTestVisible="False"
+                BorderBrush="#F2CB8C" BorderThickness="1">
+            <StackPanel Orientation="Horizontal">
+                <Viewbox Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,10,0">
+                    <Canvas Width="24" Height="24">
+                        <Path Stroke="#F2CB8C" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              Data="M5,4h11a3,3 0 0 1 3,3v13H8a3,3 0 0 1 -3,-3z M5,17a3,3 0 0 1 3,-3h11"/>
+                    </Canvas>
+                </Viewbox>
+                <StackPanel>
+                    <TextBlock Text="Added to your dictionary" Foreground="#F2CB8C" FontSize="11.5" FontWeight="SemiBold" FontFamily="Segoe UI Variable Text, Segoe UI"/>
+                    <TextBlock x:Name="LearnToastText" Foreground="#F8F6EF" FontSize="13" FontFamily="Segoe UI Variable Text, Segoe UI"
+                               TextWrapping="Wrap" MaxWidth="300"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
         <Border x:Name="Toast" Visibility="Collapsed" Background="#F2102821" CornerRadius="10" Padding="12,7"
                 Margin="0,0,0,6" HorizontalAlignment="Center" IsHitTestVisible="False">
             <TextBlock x:Name="ToastText" Foreground="#F8F6EF" FontSize="12.5" FontFamily="Segoe UI Variable Text, Segoe UI"

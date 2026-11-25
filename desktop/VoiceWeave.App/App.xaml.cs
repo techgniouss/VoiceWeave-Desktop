@@ -395,13 +395,15 @@ public partial class App : Application
         _learner = new CorrectionLearner(UiaFieldText.CaptureFocused, new DictionaryFileStore(), LearnerTiming.Default)
         {
             Enabled = _settings.LearnCorrections,
+            Trace = line => DiagLog.Write("learning " + line),
         };
         _learner.Learned += message =>
         {
             DiagLog.Write("learned a correction");
             Dispatcher.BeginInvoke(() =>
             {
-                _overlay.ShowToast(message, 3500);
+                const string prefix = "Remembered: ";
+                _overlay.ShowLearned(message.StartsWith(prefix, StringComparison.Ordinal) ? message[prefix.Length..] : message);
                 _tray.SetUndoEnabled(_learner.CanUndo);
             });
         };

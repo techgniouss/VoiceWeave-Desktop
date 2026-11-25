@@ -28,6 +28,9 @@ public sealed class CorrectionLearner(Func<IFieldText?> captureFocusedField, IRu
 
     public bool Enabled { get; set; } = true;
 
+    /// <summary>Why a watch ended without learning (never contains the text), for the diagnostic log.</summary>
+    public Action<string>? Trace { get; set; }
+
     public bool CanUndo { get { lock (_gate) return _lastLearned.Count > 0; } }
 
     /// <summary>Starts watching the field the user is in for corrections to <paramref name="pastedText"/>, replacing any earlier watch.</summary>
@@ -42,6 +45,7 @@ public sealed class CorrectionLearner(Func<IFieldText?> captureFocusedField, IRu
             _lastLearned = new List<string>();
         }
         var learnedThisWatch = new List<string>();
+        Trace?.Invoke("watch: started");
         _ = Task.Run(() => RunAsync(pastedText, learnedThisWatch, cts.Token));
     }
 
@@ -68,9 +72,9 @@ public sealed class CorrectionLearner(Func<IFieldText?> captureFocusedField, IRu
             await Task.Delay(timing.InitialDelay, ct);
             var field = captureFocusedField();
             var text = field?.Read();
-            if (field == null || text == null) return;
+            if (field == null || text == null) { Trace?.Invoke("watch: this field does not expose its text, so nothing can be learned here"); return; }
             var watch = LearningWatch.TryCreate(text, pasted);
-            if (watch == null) return; // the paste cannot be found in what we can read, so we cannot tell what is a correction
+            if (watch == null) { Trace?.Invoke("watch: the pasted text was not found in the field"); return; } // we cannot tell what is a correction
 
             var reviewed = new HashSet<LearnedEdit>();
             var lastRegion = watch.Dictated;
@@ -81,9 +85,9 @@ public sealed class CorrectionLearner(Func<IFieldText?> captureFocusedField, IRu
             {
                 await Task.Delay(timing.PollEvery, ct);
                 text = field.Read();
-                if (text == null) return;
+                if (text == null) { Trace?.Invoke("watch: the field closed or became unreadable"); return; }
                 var region = watch.RegionIn(text);
-                if (region == null) return; // the text around the dictation was rewritten: stop rather than guess
+                if (region == null) { Trace?.Invoke("watch: the text around the dictation was rewritten, stopped"); return; } // stop rather than guess
 
                 if (region != lastRegion) { lastRegion = region; changedAt = DateTime.UtcNow; continue; } // still being edited
                 if (region == watch.Dictated) continue;                                                   // untouched
@@ -93,7 +97,7 @@ public sealed class CorrectionLearner(Func<IFieldText?> captureFocusedField, IRu
                 {
                     if (!reviewed.Add(edit)) continue;
                     var result = DictionaryRules.TryLearn(store.Read(), edit);
-                    if (result.Line == null) continue;
+                    if (result.Line == null) { Trace?.Invoke("watch: correction seen but not added (" + result.Message.Split(':')[0] + ")"); continue; }
                     store.Append(result.Line);
                     learnedThisWatch.Add(result.Line);
                     lock (_gate) { if (!ct.IsCancellationRequested) _lastLearned = new List<string>(learnedThisWatch); }
