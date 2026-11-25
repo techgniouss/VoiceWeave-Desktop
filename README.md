@@ -10,7 +10,7 @@ Companion to the Android app, [VoiceWeave](https://github.com/techgniouss/VoiceW
 2. Run it. Windows may say "unknown publisher" because the installer is not code-signed: choose **More info**, then **Run anyway**. You can compare the download with the `.sha256` file on the release page.
 3. On first launch the app downloads its speech models (about 1.3 GB, checked against a fixed hash). The floating bar shows progress and then "Ready".
 
-It installs for your user only (no administrator prompt) and does **not** start with Windows unless you turn that on in the tray menu. If it isn't running, open **VoiceWeave** from the Start menu and it is ready straight away.
+It installs for your user only (no administrator prompt) and starts with Windows by default (untick that box in the installer, or turn it off any time in Windows Settings > Apps > Startup, Task Manager > Startup apps, or the app's Settings). If it isn't running, open **VoiceWeave** from the Start menu and it is ready straight away.
 
 ## Use
 

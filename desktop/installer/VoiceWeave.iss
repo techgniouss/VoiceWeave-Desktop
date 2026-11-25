@@ -33,6 +33,7 @@ RestartApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"
+Name: "startup"; Description: "Start VoiceWeave when I sign in to Windows (you can turn this off later in Windows Settings, Apps, Startup)"
 
 [Files]
 Source: "..\publish\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
@@ -43,8 +44,11 @@ Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{autoprograms}\VoiceWeave"; Filename: "{app}\VoiceWeave.exe"
 Name: "{autodesktop}\VoiceWeave"; Filename: "{app}\VoiceWeave.exe"; Tasks: desktopicon
 
-; The installer never turns on "Start with Windows". If the user turned it on inside the app, remove that entry on uninstall.
+; A fresh install adds VoiceWeave to the per-user startup list (the same entry the in-app switch uses), so it shows under
+; Windows Settings > Apps > Startup and Task Manager > Startup apps, where it can be turned off. An update never touches
+; it, so a user who turned it off stays off. The entry is removed on uninstall either way.
 [Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "VoiceWeave"; ValueData: """{app}\VoiceWeave.exe"" --background"; Flags: uninsdeletevalue; Tasks: startup; Check: IsFreshInstall
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "VoiceWeave"; Flags: dontcreatekey uninsdeletevalue
 
 [Run]
@@ -53,6 +57,20 @@ Filename: "{app}\VoiceWeave.exe"; Description: "Start VoiceWeave now"; Flags: no
 Filename: "{app}\VoiceWeave.exe"; Flags: nowait runasoriginaluser; Check: WizardSilent
 
 [Code]
+var
+  AlreadyInstalled: Boolean;
+
+function InitializeSetup(): Boolean;
+begin
+  AlreadyInstalled := RegKeyExists(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B7E3C1D4-5A2F-4E8B-9C61-3D7F0A4E9B52}_is1');
+  Result := True;
+end;
+
+function IsFreshInstall: Boolean;
+begin
+  Result := not AlreadyInstalled;
+end;
+
 // Downloaded models are large, so ask before deleting them (a silent uninstall keeps them).
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin

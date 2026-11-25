@@ -221,7 +221,7 @@
                         <StackPanel>
                             <TextBlock Text="General" Style="{StaticResource H2}"/>
                             <CheckBox x:Name="StartupBox" Content="Start VoiceWeave when I sign in to Windows" Style="{StaticResource Switch}" Click="OnStartupClicked"/>
-                            <TextBlock Text="Off by default. You can also turn it off in Windows Settings, under Apps, Startup." Style="{StaticResource Subtle}" Margin="0,0,0,8"/>
+                            <TextBlock Text="On after a normal install. You can also turn it off in Windows Settings, under Apps, Startup." Style="{StaticResource Subtle}" Margin="0,0,0,8"/>
                             <CheckBox x:Name="BarBox" Content="Show the floating bar on screen" Style="{StaticResource Switch}" Click="OnBarClicked"/>
                             <CheckBox x:Name="LearnBox" Content="Learn from my corrections" Style="{StaticResource Switch}" Click="OnLearnClicked"/>
                             <TextBlock Text="When you fix a misheard word after dictating, it is added to your dictionary." Style="{StaticResource Subtle}" Margin="0,0,0,8"/>
