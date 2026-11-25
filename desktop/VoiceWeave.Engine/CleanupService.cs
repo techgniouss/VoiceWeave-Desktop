@@ -19,18 +19,20 @@ public sealed class CleanupService(ICleaner cleaner)
     public string Run(string text, Tone tone, IReadOnlyList<string> protectedTerms)
     {
         var input = CleanupGate.StripNoise(text);
-        if (input.Length == 0 || !CleanupGate.NeedsCleanup(input)) return input;
+        if (input.Length == 0) return input;
+        var fallback = CleanupGate.Tidy(input, protectedTerms); // capital letter and full stop, with no model involved
+        if (!CleanupGate.NeedsCleanup(input)) return fallback;
 
         string output;
         try { output = cleaner.Clean(input, tone).Trim(); }
         catch (Exception e) when (e is InvalidOperationException or IOException or ObjectDisposedException or NotSupportedException)
         {
-            return input;
+            return fallback;
         }
 
-        if (output.Length == 0) return input;
-        if (output.Length > input.Length * 2 + 20) return input; // model rambled or followed an instruction in the text
-        if (!CleanupGate.ProtectedTermsIntact(input, output, protectedTerms)) return input;
+        if (output.Length == 0) return fallback;
+        if (output.Length > input.Length * 2 + 20) return fallback; // model rambled or followed an instruction in the text
+        if (!CleanupGate.ProtectedTermsIntact(input, output, protectedTerms)) return fallback;
         return output;
     }
 }

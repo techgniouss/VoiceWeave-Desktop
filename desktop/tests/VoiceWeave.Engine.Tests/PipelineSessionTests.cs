@@ -84,14 +84,14 @@ public class PipelineSessionTests
     [Fact]
     public void DictionaryIsAppliedBeforeCleanup_AndProtectsItsTerms()
     {
-        var cleaner = new CountingCleaner(_ => "I'll be near Myapur at six.");
-        var pipeline = Pipeline(new ScriptedAsr(_ => "i'll be near my pur at six"), new CleanupService(cleaner), "my pur => Myapur");
+        var cleaner = new CountingCleaner(_ => "I'll be near Myapur at 6 pm.");
+        var pipeline = Pipeline(new ScriptedAsr(_ => "i'll be near my pur at six pm"), new CleanupService(cleaner), "my pur => Myapur");
         var session = pipeline.StartSession(VoiceWeave.Engine.Tone.Casual);
         FeedLikeAMic(session, Tone(2));
         var result = session.Finish();
-        Assert.Equal("i'll be near Myapur at six", cleaner.Seen.Single());
-        Assert.Equal("I'll be near Myapur at six.", result.Final);
-        Assert.Equal("i'll be near my pur at six", result.Raw);
+        Assert.Equal("i'll be near Myapur at six pm", cleaner.Seen.Single());
+        Assert.Equal("I'll be near Myapur at 6 pm.", result.Final);
+        Assert.Equal("i'll be near my pur at six pm", result.Raw);
     }
 
     [Fact]

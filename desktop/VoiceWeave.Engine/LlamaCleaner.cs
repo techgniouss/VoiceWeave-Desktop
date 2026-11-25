@@ -1,6 +1,7 @@
 using System.Text;
 using LLama;
 using LLama.Common;
+using LLama.Sampling;
 
 namespace VoiceWeave.Engine;
 
@@ -25,8 +26,11 @@ public sealed class LlamaCleaner : ICleaner
     {
         _modelPath = Path.Combine(modelDir, File.Name);
         _threads = threads;
-        _idleUnload = idleUnload ?? TimeSpan.FromMinutes(20);
+        // Loading takes several seconds, so keep the model (about 0.7 GB) ready for a working session.
+        _idleUnload = idleUnload ?? TimeSpan.FromHours(3);
     }
+
+    private const int MaxOutputTokens = 140;
 
     public static string BuildPrompt(string text, Tone tone)
     {
@@ -36,11 +40,20 @@ public sealed class LlamaCleaner : ICleaner
 
     public string Clean(string text, Tone tone)
     {
+        // Text and answer must fit the 512-token window; a stretch this long without a pause is left as recognised (CleanupService falls back).
+        if (text.Length > 600) throw new InvalidOperationException("text too long for the cleanup window");
         lock (_gate)
         {
             EnsureLoaded();
+            // Cleaned text is about as long as the input, so cap generation near that instead of the 160-token worst case.
+            var maxTokens = Math.Min(MaxOutputTokens, text.Length / 3 + 12);
             var executor = new StatelessExecutor(_weights!, _params!);
-            var infer = new InferenceParams { MaxTokens = 160, AntiPrompts = new[] { "\n" } };
+            var infer = new InferenceParams
+            {
+                MaxTokens = maxTokens,
+                AntiPrompts = new[] { "\n" },
+                SamplingPipeline = new GreedySamplingPipeline(), // same answer every time, and no sampling work
+            };
             var sb = new StringBuilder();
             foreach (var piece in executor.InferAsync(BuildPrompt(text, tone), infer).ToBlockingEnumerable())
                 sb.Append(piece);
@@ -52,7 +65,8 @@ public sealed class LlamaCleaner : ICleaner
     private void EnsureLoaded()
     {
         if (_weights != null) return;
-        _params = new ModelParams(_modelPath) { ContextSize = 1024, GpuLayerCount = 0, Threads = _threads };
+        // A sentence and its cleaned copy fit easily in 512 tokens; a smaller context is quicker to set up for every call.
+        _params = new ModelParams(_modelPath) { ContextSize = 512, GpuLayerCount = 0, Threads = _threads, FlashAttention = true };
         _weights = LLamaWeights.LoadFromFile(_params);
         _idleTimer ??= new Timer(_ => Unload(), null, _idleUnload, Timeout.InfiniteTimeSpan);
     }

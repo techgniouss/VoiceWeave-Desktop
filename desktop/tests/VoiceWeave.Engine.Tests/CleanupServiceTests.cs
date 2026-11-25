@@ -44,36 +44,36 @@ public class CleanupServiceTests
     {
         string? seen = null;
         var svc = new CleanupService(new FakeCleaner(t => { seen = t; return "I think so."; }));
-        svc.Run("Hmm. i think so", Tone.Casual, None);
-        Assert.Equal("i think so", seen);
+        svc.Run("Hmm. i think you know so", Tone.Casual, None);
+        Assert.Equal("i think you know so", seen);
     }
 
     [Fact]
     public void ChangedProtectedTerm_FallsBackToInput()
     {
         var svc = new CleanupService(new FakeCleaner(_ => "I'll be near Maupuri at six."));
-        var result = svc.Run("i'll be near Myapur at six", Tone.Casual, new[] { "Myapur" });
-        Assert.Equal("i'll be near Myapur at six", result);
+        var result = svc.Run("i'll be near Myapur at six pm", Tone.Casual, new[] { "Myapur" });
+        Assert.Equal("I'll be near Myapur at six pm.", result);
     }
 
     [Fact]
     public void RunawayOutput_FallsBackToInput()
     {
         var svc = new CleanupService(new FakeCleaner(_ => new string('x', 500)));
-        Assert.Equal("hello", svc.Run("um hello", Tone.Casual, None)); // noise stripped, runaway output discarded
+        Assert.Equal("Hello you know.", svc.Run("um hello you know", Tone.Casual, None)); // noise stripped, runaway output discarded
     }
 
     [Fact]
     public void ModelThrows_FallsBackToInput()
     {
         var svc = new CleanupService(new FakeCleaner(_ => throw new InvalidOperationException("boom")));
-        Assert.Equal("hello there friend", svc.Run("hello there uh friend", Tone.Casual, None));
+        Assert.Equal("Hello there friend you know.", svc.Run("hello there uh friend you know", Tone.Casual, None));
     }
 
     [Fact]
     public void EmptyModelOutput_FallsBackToInput()
     {
         var svc = new CleanupService(new FakeCleaner(_ => "  "));
-        Assert.Equal("send it now", svc.Run("send it uh now", Tone.Casual, None));
+        Assert.Equal("Send it now you know.", svc.Run("send it uh now you know", Tone.Casual, None));
     }
 }
