@@ -32,13 +32,16 @@ public sealed class LlamaCleaner : ICleaner
 
     private const int MaxOutputTokens = 140;
 
-    public static string BuildPrompt(string text, Tone tone)
+    public static string BuildPrompt(string text, Tone tone, IReadOnlyList<string>? vocabulary = null)
     {
         var t = tone switch { Tone.Formal => "formal", Tone.VeryCasual => "very casual", _ => "casual" };
-        return $"tone: {t}\ntext: {text}\nout:\n";
+        var terms = vocabulary is { Count: > 0 } ? $"terms: {string.Join(", ", vocabulary)}\n" : "";
+        return $"tone: {t}\n{terms}text: {text}\nout:\n";
     }
 
-    public string Clean(string text, Tone tone)
+    public string Clean(string text, Tone tone) => Clean(text, tone, null);
+
+    public string Clean(string text, Tone tone, IReadOnlyList<string>? vocabulary)
     {
         // Text and answer must fit the 512-token window; a stretch this long without a pause is left as recognised (CleanupService falls back).
         if (text.Length > 600) throw new InvalidOperationException("text too long for the cleanup window");
@@ -55,7 +58,7 @@ public sealed class LlamaCleaner : ICleaner
                 SamplingPipeline = new GreedySamplingPipeline(), // same answer every time, and no sampling work
             };
             var sb = new StringBuilder();
-            foreach (var piece in executor.InferAsync(BuildPrompt(text, tone), infer).ToBlockingEnumerable())
+            foreach (var piece in executor.InferAsync(BuildPrompt(text, tone, vocabulary), infer).ToBlockingEnumerable())
                 sb.Append(piece);
             _idleTimer?.Change(_idleUnload, Timeout.InfiniteTimeSpan);
             return sb.ToString().Trim();

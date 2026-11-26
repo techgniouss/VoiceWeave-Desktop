@@ -47,6 +47,12 @@ public sealed class Settings
     /// <summary>Add a dictionary rule when the user corrects a word in the text box after a dictation.</summary>
     public bool LearnCorrections { get; set; } = true;
 
+    /// <summary>Choose how casual the cleaned-up text is from the program being typed into (chat relaxed, mail formal). Off by default.</summary>
+    public bool ToneByApp { get; set; }
+
+    /// <summary>Show the cleanup model the person's newest dictionary terms so it spells them their way. Slower, so off by default.</summary>
+    public bool VocabularyCleanup { get; set; }
+
     /// <summary>Also fix words that sound like a dictionary term ("Sreekant" for Srikanth). It is a guess, so it can be turned off.</summary>
     public bool SoundAlikeMatching { get; set; } = true;
 

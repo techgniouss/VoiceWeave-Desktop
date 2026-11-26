@@ -100,6 +100,8 @@ public partial class MainWindow : Window
             KeepHistoryBox.IsChecked = s.KeepHistory;
             AutoUpdateBox.IsChecked = s.AutoUpdate;
             SoundAlikeBox.IsChecked = s.SoundAlikeMatching;
+            ToneAppBox.IsChecked = s.ToneByApp;
+            VocabBox.IsChecked = s.VocabularyCleanup;
             WakeBox.IsChecked = s.WakeWordEnabled;
             if (!WakePhraseBox.IsKeyboardFocusWithin) WakePhraseBox.Text = s.WakeWordPhrase;
             WakeStatusText.Text = _app.WakeWordStatus;
@@ -138,6 +140,8 @@ public partial class MainWindow : Window
     private void OnRomanClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetRoman(RomanBox.IsChecked == true); }
     private void OnStartupClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetStartup(StartupBox.IsChecked == true); }
     private void OnBarClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetBarVisible(BarBox.IsChecked == true); }
+    private void OnToneAppClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetToneByApp(ToneAppBox.IsChecked == true); }
+    private void OnVocabClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetVocabularyCleanup(VocabBox.IsChecked == true); }
     private void OnSoundAlikeClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetSoundAlike(SoundAlikeBox.IsChecked == true); }
     private void OnWakeClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetWakeWord(WakeBox.IsChecked == true); }
     private void OnSetWakePhrase(object sender, RoutedEventArgs e)

@@ -440,7 +440,7 @@ public partial class App : Application
             KnownTerms = () => _pipeline!.Dictionary.Terms.ToHashSet(StringComparer.OrdinalIgnoreCase),
         };
         _cleaner = new LlamaCleaner(AppPaths.Models);
-        _pipeline = new DictationPipeline(_router, new CleanupService(_cleaner), LoadDictionary())
+        _pipeline = new DictationPipeline(_router, new CleanupService(_cleaner) { UseVocabulary = () => _settings.VocabularyCleanup }, LoadDictionary())
         {
             RomanOutput = () => _settings.RomanOutput,
         };
@@ -486,6 +486,29 @@ public partial class App : Application
         catch (IOException) { return CoreDictionary.Parse("", _settings.SoundAlikeMatching); }
     }
 
+    /// <summary>How casual this dictation should read: from the program in front when that setting is on, otherwise casual.</summary>
+    private Tone ToneNow()
+    {
+        if (!_settings.ToneByApp) return Tone.Casual;
+        var tone = ToneByApp.For(ForegroundApp.ProcessName());
+        DiagLog.Write("tone by app: " + tone);
+        return tone;
+    }
+
+    public void SetToneByApp(bool on)
+    {
+        _settings.ToneByApp = on;
+        _settings.Save();
+        SettingsChanged?.Invoke();
+    }
+
+    public void SetVocabularyCleanup(bool on)
+    {
+        _settings.VocabularyCleanup = on;
+        _settings.Save();
+        SettingsChanged?.Invoke();
+    }
+
     public void SetSoundAlike(bool on)
     {
         _settings.SoundAlikeMatching = on;
@@ -518,7 +541,7 @@ public partial class App : Application
         _clipboard = new Win32Clipboard(_overlay.Handle);
         // Each dictation gets a session that recognises sentences while you are still speaking.
         _controller = new DictationController(recorder,
-            () => _pipeline!.StartSession(Tone.Casual, () => EnsureModeAsync(SpeechModes.Parse(_settings.Language))),
+            () => _pipeline!.StartSession(ToneNow(), () => EnsureModeAsync(SpeechModes.Parse(_settings.Language))),
             _clipboard, new SendInputPaster(), FocusProbe.Get, TimeSpan.FromMilliseconds(150));
 
         // Self-learning: after a paste, watch that stretch of the text box and turn the user's fixes into dictionary rules.

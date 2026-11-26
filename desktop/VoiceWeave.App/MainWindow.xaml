@@ -239,6 +239,16 @@
 
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
+                            <TextBlock Text="Cleanup (optional)" Style="{StaticResource H2}"/>
+                            <CheckBox x:Name="ToneAppBox" Content="Match my writing style to the app" Style="{StaticResource Switch}" Click="OnToneAppClicked"/>
+                            <TextBlock Text="Chat apps like Slack or Teams get a relaxed style, mail and documents a formal one. Only the name of the program in front is looked at, nothing is stored, and it adds no delay." Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <CheckBox x:Name="VocabBox" Content="Improve accuracy with my vocabulary" Style="{StaticResource Switch}" Click="OnVocabClicked"/>
+                            <TextBlock Text="Shows the cleanup model your 20 newest dictionary terms so it spells them your way. Cleanup takes roughly 0.2 to 0.7 seconds longer on sentences it works on, more the longer your dictionary is. It can occasionally get a sentence wrong, so leave it off if you prefer speed." Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
                             <TextBlock Text="Wake word" Style="{StaticResource H2}"/>
                             <CheckBox x:Name="WakeBox" Content="Start dictating when I say a phrase" Style="{StaticResource Switch}" Click="OnWakeClicked"/>
                             <TextBlock Text="Hands-free: say the phrase, then speak. It stops by itself after you go quiet. Esc cancels, Ctrl+Win finishes. Needs a small extra model (downloaded once) and listens through the microphone only on this computer." Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
