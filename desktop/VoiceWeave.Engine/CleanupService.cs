@@ -18,7 +18,7 @@ public sealed class CleanupService(ICleaner cleaner)
 {
     public string Run(string text, Tone tone, IReadOnlyList<string> protectedTerms)
     {
-        var input = CleanupGate.StripNoise(text);
+        var input = CleanupGate.StripNoise(CleanupGate.CollapseRepeats(text));
         if (input.Length == 0) return input;
         var fallback = CleanupGate.Tidy(input, protectedTerms); // capital letter and full stop, with no model involved
         if (!CleanupGate.NeedsCleanup(input)) return fallback;

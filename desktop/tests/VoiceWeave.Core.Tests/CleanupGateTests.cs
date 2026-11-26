@@ -50,6 +50,31 @@ public class CleanupGateTests
     public void StripNoise_RemovesStandaloneFillers_NotWordsContainingThem() =>
         Assert.Equal("The umbrella is here", CleanupGate.StripNoise("The umbrella is here um"));
 
+    [Theory]
+    [InlineData("send it to john no no to maria")]
+    [InlineData("it has three k make that four k stars")]
+    [InlineData("hold on let me start over")]
+    [InlineData("open src colon main")]
+    [InlineData("call it my underscore file")]
+    [InlineData("use a dash here")]
+    public void NeedsCleanup_ForMoreCorrectionCuesAndSpokenSymbols(string text) =>
+        Assert.True(CleanupGate.NeedsCleanup(text));
+
+    [Fact]
+    public void CollapseRepeats_DropsWordLoop() =>
+        Assert.Equal("See the docs", CleanupGate.CollapseRepeats("See the docs URL URL, URL. url URL URL"));
+
+    [Fact]
+    public void CollapseRepeats_DropsPhraseLoop() =>
+        Assert.Equal("Thanks all", CleanupGate.CollapseRepeats("Thanks all" + string.Concat(Enumerable.Repeat(" thanks for watching", 6))));
+
+    [Theory]
+    [InlineData("no no no no no")]
+    [InlineData("yeah yeah yeah that works")]
+    [InlineData("Plain sentence with nothing odd")]
+    public void CollapseRepeats_KeepsEmphasis(string text) =>
+        Assert.Equal(text, CleanupGate.CollapseRepeats(text));
+
     [Fact]
     public void ChangedProtectedTerm_Rejected() =>
         Assert.False(CleanupGate.ProtectedTermsIntact("I'll be near Myapur at six", "I'll be near Maupuri at six.", new[] { "Myapur" }));

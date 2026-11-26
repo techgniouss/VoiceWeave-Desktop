@@ -8,9 +8,39 @@ public static class CleanupGate
     private const RegexOptions Opts = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled;
 
     private static readonly Regex Filler = new(@"(?<![\p{L}\p{N}])(?:um+|uh+|er+m?|hmm+|mhm|mm-hmm|you know|i mean)(?![\p{L}\p{N}])", Opts);
-    private static readonly Regex Correction = new(@"(?<![\p{L}\p{N}])(?:no wait|scratch that|sorry i mean|actually no)(?![\p{L}\p{N}])", Opts);
+    private static readonly Regex Correction = new(@"(?<![\p{L}\p{N}])(?:no wait|scratch that|sorry i mean|actually no|no no|make that|let me start over|start over)(?![\p{L}\p{N}])", Opts);
     private static readonly Regex NumberWord = new(@"(?<![\p{L}\p{N}])(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|percent)(?![\p{L}\p{N}])", Opts);
-    private static readonly Regex Spoken = new(@"(?<![\p{L}\p{N}])dot(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])slash(?![\p{L}\p{N}])", Opts);
+    private static readonly Regex Spoken = new(@"(?<![\p{L}\p{N}])(?:dot|slash|colon|dash|hyphen|underscore)(?![\p{L}\p{N}])", Opts);
+
+    // Speech models sometimes loop when audio trails off ("thanks for watching" x many). Runs this long are never real speech.
+    private const int RepeatRun = 6;
+    private static readonly Regex RepeatedPhrase = new(@"(.{2,60}?)\1{" + (RepeatRun - 1) + ",}", RegexOptions.Singleline | RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Drops recogniser loops: a word repeated six or more times in a row, or any 2-60 character stretch repeated six or more
+    /// times. Ordinary emphasis ("no no no no no", "yeah yeah yeah") stays. Idea from the MIT-licensed jamiepine/voicebox.
+    /// </summary>
+    public static string CollapseRepeats(string text)
+    {
+        var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length >= RepeatRun)
+        {
+            var kept = new List<string>(words.Length);
+            for (var i = 0; i < words.Length;)
+            {
+                var key = WordKey(words[i]);
+                var j = i + 1;
+                if (key.Length > 0) while (j < words.Length && WordKey(words[j]) == key) j++;
+                if (j - i < RepeatRun) kept.AddRange(words[i..j]);
+                i = j;
+            }
+            if (kept.Count != words.Length) text = string.Join(' ', kept);
+        }
+        var stripped = RepeatedPhrase.Replace(text, "");
+        return stripped == text ? text : Regex.Replace(stripped, @"\s+", " ").Trim();
+    }
+
+    private static string WordKey(string w) => Regex.Replace(w, @"[^\p{L}\p{N}]", "").ToLowerInvariant();
 
     // Removes standalone noise tokens plus the punctuation right after them; never touches words that merely contain them.
     private static readonly Regex Noise = new(@"(?<![\p{L}\p{N}])(?:mm-hmm|mhm|hmm+|hm+|um+|uh+|erm|er)(?![\p{L}\p{N}])[.,;!?]?\s*", Opts);
