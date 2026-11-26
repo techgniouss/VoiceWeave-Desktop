@@ -46,6 +46,12 @@ public sealed class Recorder(IAudioSource source, PreRoll preRoll)
         }
     }
 
+    /// <summary>Forgets the audio just before now (the wake phrase itself must not become part of the dictation).</summary>
+    public void DiscardPreRoll()
+    {
+        lock (_gate) preRoll.Take();
+    }
+
     public void BeginUtterance()
     {
         float[] lead;

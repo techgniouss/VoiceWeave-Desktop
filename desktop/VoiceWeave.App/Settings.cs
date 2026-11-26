@@ -53,6 +53,18 @@ public sealed class Settings
     /// <summary>Look for a newer release on GitHub at start-up and every few hours. Nothing installs without a click.</summary>
     public bool AutoUpdate { get; set; } = true;
 
+    /// <summary>Start a hands-free dictation when the wake phrase is heard. Off until the user turns it on (it needs a small extra model).</summary>
+    public bool WakeWordEnabled { get; set; }
+
+    /// <summary>What to say to start listening. Plain English words; the user can change it.</summary>
+    public string WakeWordPhrase { get; set; } = "hey voice";
+
+    /// <summary>How sure the model must be before it reacts (0 to 1). Raise it if it starts by mistake, lower it if it misses you.</summary>
+    public float WakeWordThreshold { get; set; } = 0.25f;
+
+    /// <summary>How strongly the phrase is favoured over other sounds. Higher finds it more easily and also fires more falsely.</summary>
+    public float WakeWordBoost { get; set; } = 2.0f;
+
     public static Settings Load()
     {
         try { return JsonSerializer.Deserialize<Settings>(File.ReadAllText(AppPaths.SettingsFile)) ?? new Settings(); }

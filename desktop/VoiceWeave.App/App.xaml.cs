@@ -34,6 +34,11 @@ public partial class App : Application
     private LlamaCleaner _cleaner = null!;
     private CorrectionLearner _learner = null!;
     private System.Net.Http.HttpClient? _http;
+    private ModelManager? _models;
+    private WakeWordService? _wake;
+    private readonly SemaphoreSlim _wakeGate = new(1, 1);
+    private readonly SilenceEnder _ender = new();
+    private volatile bool _wakeSession; // the dictation in progress began with the wake phrase, so nobody is holding a key
     private FileSystemWatcher? _watcher;
     private readonly StartupRegistration _startup = new();
     private readonly CancellationTokenSource _exit = new();
@@ -43,6 +48,8 @@ public partial class App : Application
     public Settings Settings => _settings;
     public HistoryStore? History { get; private set; }
     public string StatusText { get; private set; } = "Starting…";
+    /// <summary>What the wake word is doing: downloading, listening for a phrase, or why it is off.</summary>
+    public string WakeWordStatus { get; private set; } = "";
     public SpeechMode Mode => _router.Mode;
     public bool StartupEnabled => _startup.IsEnabled();
 
@@ -101,6 +108,7 @@ public partial class App : Application
 
         InitEngines();
         StartAudioAndController();
+        _ = ApplyWakeWordAsync();
         WireOverlay();
         StartHotkey();
         WatchDictionary();
@@ -163,6 +171,120 @@ public partial class App : Application
         if (!on) _learner.Cancel();
         _tray.SetLearnChecked(on);
         SettingsChanged?.Invoke();
+    }
+
+    public void SetWakeWord(bool on)
+    {
+        _settings.WakeWordEnabled = on;
+        _settings.Save();
+        SettingsChanged?.Invoke();
+        _ = ApplyWakeWordAsync();
+    }
+
+    /// <returns>Null when the phrase was accepted, otherwise what is wrong with it.</returns>
+    public string? SetWakeWordPhrase(string phrase)
+    {
+        phrase = string.Join(' ', phrase.Split(' ', StringSplitOptions.RemoveEmptyEntries)).Trim();
+        if (WakeWordTokenizer.Words(phrase) == null) return "Use one to six plain English words, letters only.";
+        if (phrase.Length < 6) return "That is too short, it would start by mistake. Try something like \"hey voice\".";
+        _settings.WakeWordPhrase = phrase;
+        _settings.Save();
+        SettingsChanged?.Invoke();
+        if (_wake != null)
+        {
+            try { _wake.Spotter.SetPhrase(phrase); SetWakeStatus($"Listening for \"{phrase}\""); }
+            catch (ArgumentException e) { return e.Message; }
+        }
+        return null;
+    }
+
+    private void SetWakeStatus(string text)
+    {
+        WakeWordStatus = text;
+        DiagLog.Write("wake word: " + text);
+        Dispatcher.BeginInvoke(() => SettingsChanged?.Invoke());
+    }
+
+    private void StopWakeWord()
+    {
+        var service = _wake;
+        _wake = null;
+        if (service == null) return;
+        if (_mic != null) _mic.Samples -= service.Feed;
+        service.Dispose();
+    }
+
+    /// <summary>Starts or stops listening for the wake phrase to match the setting, downloading its small model the first time.</summary>
+    private async Task ApplyWakeWordAsync()
+    {
+        await _wakeGate.WaitAsync();
+        try
+        {
+            StopWakeWord();
+            if (!_settings.WakeWordEnabled) { SetWakeStatus(""); return; }
+            if (_mic == null || _models == null) { SetWakeStatus("No microphone available"); return; }
+
+            var progress = new Progress<double>(p => { if (p is > 0 and < 1) SetWakeStatus($"Downloading the wake word model: {p:P0}"); });
+            await WakeWordModel.EnsureAsync(_models, AppPaths.Models, progress, _exit.Token);
+
+            var dir = Path.Combine(AppPaths.Models, WakeWordModel.Folder);
+            var spotter = await Task.Run(() => new WakeWordSpotter(dir, _settings.WakeWordPhrase, _settings.WakeWordBoost, _settings.WakeWordThreshold));
+            var service = new WakeWordService(spotter) { Paused = () => _controller.State != DictationState.Idle };
+            service.Heard += OnWakeWordHeard;
+            _wake = service;
+            _mic.Samples += service.Feed;
+            SetWakeStatus($"Listening for \"{_settings.WakeWordPhrase}\"");
+            _ = Task.Run(() => LogWakeWordLoadAsync(service));
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception e)
+        {
+            StopWakeWord();
+            SetWakeStatus("The wake word is unavailable: " + e.Message);
+        }
+        finally { _wakeGate.Release(); }
+    }
+
+    /// <summary>For the diagnostic log: how much processor the listening takes, so a slow machine can be spotted.</summary>
+    private async Task LogWakeWordLoadAsync(WakeWordService service)
+    {
+        try
+        {
+            while (ReferenceEquals(_wake, service) && !_exit.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(1), _exit.Token);
+                using var self = System.Diagnostics.Process.GetCurrentProcess();
+                DiagLog.Write($"wake word load: {service.CpuPerAudioSecond:P2} of one core while listening; app memory {self.WorkingSet64 / (1024 * 1024)} MB");
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void OnWakeWordHeard()
+    {
+        if (_controller.State != DictationState.Idle) return;
+        DiagLog.Write("wake word heard");
+        _ender.Start(Environment.TickCount64);
+        _wakeSession = true;
+        _controller.Begin(latched: true, dropPreRoll: true);
+    }
+
+    /// <summary>Ends a dictation started by the wake phrase once the person stops talking (or never starts).</summary>
+    private void OnWakeLevel(float rms)
+    {
+        if (!_wakeSession) return;
+        switch (_ender.OnLevel(rms, Environment.TickCount64))
+        {
+            case EndAction.Finish:
+                _wakeSession = false;
+                _controller.Finish();
+                break;
+            case EndAction.Cancel:
+                _wakeSession = false;
+                _controller.Cancel();
+                Dispatcher.BeginInvoke(() => _overlay.ShowToast("Didn't hear anything", 2500));
+                break;
+        }
     }
 
     public void SetBarVisible(bool on)
@@ -308,7 +430,7 @@ public partial class App : Application
     private void InitEngines()
     {
         _http = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-        var models = new ModelManager(_http);
+        var models = _models = new ModelManager(_http);
         _engines = new EngineManager(models, AppPaths.Models, LanguagePacks.For);
         _lid = new LanguageIdManager(models, AppPaths.Models, WhisperLanguageId.Files, dir => new WhisperLanguageId(dir));
         var mode = SpeechModes.Parse(_settings.Language);
@@ -409,6 +531,8 @@ public partial class App : Application
         };
         _controller.Pasted += (result, _) => _learner.Watch(result.Final, result.Rules);
         _controller.StateChanged += state => { if (state == DictationState.Recording) _learner.Cancel(); };
+        _controller.StateChanged += state => { if (state != DictationState.Recording) _wakeSession = false; };
+        _controller.Level += OnWakeLevel;
 
         // History: every dictation that produced text, except text meant for a password box.
         _controller.Finished += (result, outcome, total) =>
@@ -507,6 +631,9 @@ public partial class App : Application
         {
             await foreach (var (ev, t) in events.Reader.ReadAllAsync(_exit.Token))
             {
+                // A dictation the wake phrase started has no key held: Esc cancels it and Ctrl+Win finishes it.
+                if (_wakeSession && ev == Core.KeyEvent.EscDown) { _wakeSession = false; _controller.Cancel(); continue; }
+                if (_wakeSession && ev == Core.KeyEvent.HoldDown) { _wakeSession = false; _controller.Finish(); continue; }
                 var action = machine.On(ev, t);
                 if (action != HotkeyAction.None) DiagLog.Write($"hotkey: {ev} -> {action}");
                 switch (action)
@@ -559,6 +686,7 @@ public partial class App : Application
         _engines?.Dispose();
         _lid?.Dispose();
         _learner?.Dispose();
+        StopWakeWord();
         _cleaner?.Dispose();
         _http?.Dispose();
         _tray?.Dispose();

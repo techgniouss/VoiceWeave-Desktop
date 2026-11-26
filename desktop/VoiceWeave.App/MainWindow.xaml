@@ -237,6 +237,19 @@
 
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
+                            <TextBlock Text="Wake word" Style="{StaticResource H2}"/>
+                            <CheckBox x:Name="WakeBox" Content="Start dictating when I say a phrase" Style="{StaticResource Switch}" Click="OnWakeClicked"/>
+                            <TextBlock Text="Hands-free: say the phrase, then speak. It stops by itself after you go quiet. Esc cancels, Ctrl+Win finishes. Needs a small extra model (downloaded once) and listens through the microphone only on this computer." Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Name="WakePhraseBox" Width="240" MaxLength="40"/>
+                                <Button Content="Set phrase" Style="{StaticResource GhostButton}" Margin="10,0,0,0" Click="OnSetWakePhrase"/>
+                            </StackPanel>
+                            <TextBlock x:Name="WakeStatusText" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
                             <TextBlock Text="Speech models" Style="{StaticResource H2}"/>
                             <TextBlock x:Name="ModelsPath" Style="{StaticResource Subtle}" Margin="0,0,0,10"/>
                             <Button Content="Open models folder" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Click="OnOpenModels"/>

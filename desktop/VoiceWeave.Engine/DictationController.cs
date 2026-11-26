@@ -57,11 +57,13 @@ public sealed class DictationController : IDisposable
 
     public bool IsLatched { get { lock (_gate) return _latched; } }
 
-    public void Begin(bool latched)
+    /// <param name="dropPreRoll">Leave out the last half second of audio (it holds the wake phrase, not the dictation).</param>
+    public void Begin(bool latched, bool dropPreRoll = false)
     {
         lock (_gate)
         {
             if (_recording) return;
+            if (dropPreRoll) _recorder.DiscardPreRoll();
             _session = _newSession();           // before the recorder starts, so the pre-roll audio reaches it too
             _recorder.BeginUtterance();
             _recording = true;
