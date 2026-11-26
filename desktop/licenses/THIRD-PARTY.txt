@@ -9,6 +9,7 @@ ONNX Runtime (Microsoft)    MIT          https://github.com/microsoft/onnxruntim
 LLamaSharp                  MIT          https://github.com/SciSharp/LLamaSharp
 llama.cpp (ggml)            MIT          https://github.com/ggml-org/llama.cpp
 NAudio (Mark Heath)         MIT          https://github.com/naudio/NAudio
+SharpZipLib                 MIT          https://github.com/icsharpcode/SharpZipLib
 .NET runtime (Microsoft)    MIT          https://github.com/dotnet/runtime
 
 English word list (used to tell English from other languages)
@@ -30,6 +31,11 @@ Spokenly Cleanup 1 by Spokenly            Apache-2.0
     https://huggingface.co/spokenly/cleanup-1-gguf
     A fine-tune of Qwen3-0.6B-Base (Copyright 2024 Alibaba Cloud, Apache-2.0),
     converted to GGUF with 8-bit weights (Q8_0) by Spokenly.
+
+Wake word model (sherpa-onnx keyword spotter)   Apache-2.0
+    sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01 by the k2-fsa / icefall authors:
+    https://github.com/k2-fsa/sherpa-onnx/releases/tag/kws-models
+    Downloaded only when the wake word is turned on. About 5 MB of the 17 MB archive is kept, unchanged.
 
 Whisper-base (OpenAI)                     MIT
     https://github.com/openai/whisper
