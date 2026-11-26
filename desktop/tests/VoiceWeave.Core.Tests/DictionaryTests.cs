@@ -90,6 +90,15 @@ public class DictionaryTests
     }
 
     [Fact]
+    public void IndicWords_AreNeverNearMissMatched()
+    {
+        // a different Telugu word, two letters away from the rule's word, must stay as it is
+        var d = Dictionary.Parse("హైదరాబాద్ => Hyderabad");
+        Assert.Equal("హిదరాబాద", d.Apply("హిదరాబాద"));
+        Assert.Equal("Hyderabad", d.Apply("హైదరాబాద్")); // the exact rule still works
+    }
+
+    [Fact]
     public void IndicWord_NotReplacedInsideALongerWord()
     {
         var d = Dictionary.Parse("కల => Kala");

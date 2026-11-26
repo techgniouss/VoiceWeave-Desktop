@@ -47,6 +47,9 @@ public sealed class Settings
     /// <summary>Add a dictionary rule when the user corrects a word in the text box after a dictation.</summary>
     public bool LearnCorrections { get; set; } = true;
 
+    /// <summary>Also fix words that sound like a dictionary term ("Sreekant" for Srikanth). It is a guess, so it can be turned off.</summary>
+    public bool SoundAlikeMatching { get; set; } = true;
+
     /// <summary>Write Telugu, Hindi and Tamil in English letters ("nenu repu") instead of their own script.</summary>
     public bool RomanOutput { get; set; } = true;
 

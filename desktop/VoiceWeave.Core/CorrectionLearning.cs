@@ -120,6 +120,13 @@ public static class CorrectionLearning
     private static string Squash(string text) =>
         string.Concat(Tokens(text).Select(t => t.Text.ToLowerInvariant().Replace("'", "").Replace("’", "")));
 
+    /// <summary>Whether every word of <paramref name="text"/> is an everyday function word (a, the, of, is...).</summary>
+    internal static bool AllCommon(string text)
+    {
+        var words = Tokens(text);
+        return words.Count > 0 && words.All(w => Common.Contains(w.Text.ToLowerInvariant()));
+    }
+
     /// <summary>The words of <paramref name="text"/> in lower case, one space apart.</summary>
     internal static string Normalize(string text) => string.Join(' ', Tokens(text).Select(t => t.Text.ToLowerInvariant()));
 
@@ -156,7 +163,8 @@ public static class DictionaryRules
     public static LearnResult TryLearn(string currentDictionaryText, LearnedEdit edit)
     {
         var (phrase, spelling) = edit.General ? (edit.OldWord, edit.NewWord) : (edit.Before, edit.After);
-        var applied = Dictionary.Parse(currentDictionaryText).Apply(phrase);
+        // Exact rules only: a near-miss or sound-alike guess must not stop the user from teaching a fix for the very word it got wrong.
+        var applied = Dictionary.Parse(currentDictionaryText, soundAlike: false).ApplyExact(phrase);
         if (applied == spelling) return new LearnResult(null, $"Already remembered: {phrase} → {spelling}");
         if (applied != phrase) return new LearnResult(null, "This phrase already has a rule. Edit it in the dictionary.");
         var line = $"{phrase} => {spelling}";
@@ -174,7 +182,10 @@ public static class DictionaryRules
         var changed = " " + CorrectionLearning.Normalize(changedWords) + " ";
         var written = " " + CorrectionLearning.Normalize(preferred) + " ";
         if (changed.Trim().Length == 0 || written.Trim().Length == 0) return false;
-        return written.Contains(changed, StringComparison.Ordinal) || changed.Contains(written, StringComparison.Ordinal);
+        if (changed.Contains(written, StringComparison.Ordinal)) return true;
+        if (!written.Contains(changed, StringComparison.Ordinal)) return false;
+        // Only part of what the rule wrote was changed. Fixing "of" or "the" says nothing about a rule like "Bank of America".
+        return changed == written || !CorrectionLearning.AllCommon(changed);
     }
 
     /// <summary>The "heard => preferred" parts of a dictionary line, or null for anything else.</summary>

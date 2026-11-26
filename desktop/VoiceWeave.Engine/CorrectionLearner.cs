@@ -150,7 +150,8 @@ public sealed class CorrectionLearner(Func<IFieldText?> captureFocusedField, IRu
                     if (!reviewed.Add(edit)) continue;
 
                     // The user is fixing what a dictionary rule wrote: that rule is wrong, so drop it instead of repeating the mistake.
-                    var dropped = rules.Where(r => DictionaryRules.Touches(edit.OldWord, r.Preferred) && store.Remove(r.Line)).ToList();
+                    // A rule that only matched by a near-miss or a sound-alike guess is not dropped: the guess was wrong, not the rule.
+                    var dropped = rules.Where(r => !r.Approximate && DictionaryRules.Touches(edit.OldWord, r.Preferred) && store.Remove(r.Line)).ToList();
                     if (dropped.Count > 0)
                     {
                         foreach (var r in dropped) forgottenThisWatch.Add(r.Line);

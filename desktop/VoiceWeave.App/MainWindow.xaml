@@ -226,6 +226,8 @@
                             <CheckBox x:Name="BarBox" Content="Show the floating bar on screen" Style="{StaticResource Switch}" Click="OnBarClicked"/>
                             <CheckBox x:Name="LearnBox" Content="Learn from my corrections" Style="{StaticResource Switch}" Click="OnLearnClicked"/>
                             <TextBlock Text="When you fix a misheard word after dictating, it is added to your dictionary." Style="{StaticResource Subtle}" Margin="0,0,0,8"/>
+                            <CheckBox x:Name="SoundAlikeBox" Content="Match words that sound like my dictionary terms" Style="{StaticResource Switch}" Click="OnSoundAlikeClicked"/>
+                            <TextBlock Text="After you teach it Srikanth, it also fixes Sreekant or Sri Kanth. It is a guess, so turn it off if it rewrites a word it should not." Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                             <CheckBox x:Name="AutoUpdateBox" Content="Check for updates automatically" Style="{StaticResource Switch}" Click="OnAutoUpdateClicked"/>
                             <TextBlock Text="Looks at the project's GitHub releases. Nothing is installed until you click Update now." Style="{StaticResource Subtle}" Margin="0,0,0,8"/>
                             <StackPanel Orientation="Horizontal">

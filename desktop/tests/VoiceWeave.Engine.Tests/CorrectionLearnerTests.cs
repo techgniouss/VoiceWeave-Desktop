@@ -241,6 +241,18 @@ public class CorrectionLearnerTests
     }
 
     [Fact]
+    public void FixingAGuessedRuleHit_KeepsTheRule()
+    {
+        var (learner, field, store, _) = Rig("send it to Srikanth now");
+        store.Content = "srikanth => Srikanth";
+        learner.Watch("send it to Srikanth now", new[] { new AppliedRule("srikanth => Srikanth", "Srikanth", Approximate: true) });
+        Thread.Sleep(40);
+        field.Text = "send it to Srikant now";
+        Thread.Sleep(500);
+        Assert.Equal("srikanth => Srikanth", store.Content);   // the guess was wrong, not the rule
+    }
+
+    [Fact]
     public void TeachSelection_LearnsFromTheLastDictation()
     {
         var (learner, _, store, messages) = Rig("unused");

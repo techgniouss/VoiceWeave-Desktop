@@ -480,10 +480,18 @@ public partial class App : Application
         catch (Exception e) { DiagLog.Write("cleanup warm-up failed: " + e.Message); }
     }
 
-    private static CoreDictionary LoadDictionary()
+    private CoreDictionary LoadDictionary()
     {
-        try { return CoreDictionary.Parse(File.ReadAllText(AppPaths.Dictionary)); }
-        catch (IOException) { return CoreDictionary.Parse(""); }
+        try { return CoreDictionary.Parse(File.ReadAllText(AppPaths.Dictionary), _settings.SoundAlikeMatching); }
+        catch (IOException) { return CoreDictionary.Parse("", _settings.SoundAlikeMatching); }
+    }
+
+    public void SetSoundAlike(bool on)
+    {
+        _settings.SoundAlikeMatching = on;
+        _settings.Save();
+        if (_pipeline != null) _pipeline.Dictionary = LoadDictionary();
+        SettingsChanged?.Invoke();
     }
 
     private void WatchDictionary()

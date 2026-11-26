@@ -204,6 +204,23 @@ public class DictionaryRulesTests
     }
 
     [Fact]
+    public void Touches_IgnoresEverydayWordsInsideALongerRule()
+    {
+        Assert.False(DictionaryRules.Touches("of", "Bank of America"));
+        Assert.False(DictionaryRules.Touches("the", "Open the Pod"));
+        Assert.True(DictionaryRules.Touches("America", "Bank of America"));
+        Assert.True(DictionaryRules.Touches("Bank of America", "Bank of America"));
+    }
+
+    [Fact]
+    public void ASoundAlikeGuess_DoesNotStopTheUserTeachingTheRealFix()
+    {
+        // "Marcus" would be guessed as Marks; correcting it to Markus must still be learnable
+        var result = DictionaryRules.TryLearn("marks => Marks", Edit("ask marcus now", "ask Markus now"));
+        Assert.True(result.Line != null, result.Message);
+    }
+
+    [Fact]
     public void Split_SeparatesHeardFromPreferred()
     {
         Assert.Equal(("sri kanth", "Srikanth"), DictionaryRules.Split("sri kanth => Srikanth"));
