@@ -72,6 +72,7 @@ public class CleanupGateTests
     [InlineData("no no no no no")]
     [InlineData("yeah yeah yeah that works")]
     [InlineData("Plain sentence with nothing odd")]
+    [InlineData("call 100000000000000")]
     public void CollapseRepeats_KeepsEmphasis(string text) =>
         Assert.Equal(text, CleanupGate.CollapseRepeats(text));
 

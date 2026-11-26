@@ -42,6 +42,10 @@ AI4Bharat IndicConformer (Telugu, Hindi, Tamil)   MIT
     Packs from https://github.com/saeedtechshop/transly-speech-packs and
     https://huggingface.co/OpenVoiceOS/ai4bharat-indicconformer-hi-onnx
 
+Voicebox (jamiepine/voicebox)   MIT
+    https://github.com/jamiepine/voicebox
+    The idea of dropping speech-recogniser repetition loops before cleanup. No code is copied.
+
 Each model is verified against a pinned SHA-256 hash before it is used.
 
 VoiceWeave is an independent project. It is not affiliated with, endorsed by, or derived from the code,

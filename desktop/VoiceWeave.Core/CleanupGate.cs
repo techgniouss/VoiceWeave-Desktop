@@ -36,8 +36,15 @@ public static class CleanupGate
             }
             if (kept.Count != words.Length) text = string.Join(' ', kept);
         }
-        var stripped = RepeatedPhrase.Replace(text, "");
-        return stripped == text ? text : Regex.Replace(stripped, @"\s+", " ").Trim();
+        // A repeated stretch only counts when it has a letter, so a long run of zeros in a number survives.
+        var changed = false;
+        var stripped = RepeatedPhrase.Replace(text, m =>
+        {
+            if (!m.Groups[1].Value.Any(char.IsLetter)) return m.Value;
+            changed = true;
+            return "";
+        });
+        return changed ? Regex.Replace(stripped, @"\s+", " ").Trim() : text;
     }
 
     private static string WordKey(string w) => Regex.Replace(w, @"[^\p{L}\p{N}]", "").ToLowerInvariant();
