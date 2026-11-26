@@ -44,9 +44,11 @@ Whisper-base (OpenAI)                     MIT
     Used only to identify the spoken language in the "English + ..." modes.
 
 AI4Bharat IndicConformer (Telugu, Hindi, Tamil)   MIT
-    https://github.com/AI4Bharat/IndicConformer
-    Packs from https://github.com/saeedtechshop/transly-speech-packs and
-    https://huggingface.co/OpenVoiceOS/ai4bharat-indicconformer-hi-onnx
+    Copyright (c) 2024 AI4Bharat. https://github.com/AI4Bharat/IndicConformerASR
+    Prepared for sherpa-onnx by others (Telugu and Tamil: https://github.com/saeedtechshop/transly-speech-packs,
+    modified: one language's decoder, ONNX, int8; Hindi: https://huggingface.co/OpenVoiceOS/ai4bharat-indicconformer-hi-onnx).
+    Exact copies are also kept at https://github.com/techgniouss/VoiceWeave-Desktop/releases/tag/mirror-indic-v1,
+    with the licence text, and are tried first; the original address is the fallback.
 
 Voicebox (jamiepine/voicebox)   MIT
     https://github.com/jamiepine/voicebox

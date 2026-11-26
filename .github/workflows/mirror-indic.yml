@@ -1,0 +1,37 @@
+name: Mirror Indic speech packs
+
+# Keeps our own copy of the Telugu, Tamil and Hindi speech files, so the app does not depend on one person's account staying online.
+# Pushing a tag such as mirror-indic-v1 downloads each file from its original address, refuses anything whose size or SHA-256
+# differs from desktop/mirror/indic-files.txt, and publishes the files as a GitHub Release with the AI4Bharat licence notice.
+# It never runs on an ordinary push, and a published mirror release is never changed: a new build gets a new tag.
+on:
+  push:
+    tags: ['mirror-indic-*']
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed only to create the release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and verify every file
+        run: bash desktop/mirror/fetch-indic.sh mirror-out
+
+      - name: Add the checksums and the licence notice
+        run: |
+          cp desktop/mirror/NOTICE.txt mirror-out/NOTICE.txt
+          (cd mirror-out && sha256sum indicconformer-* > SHA256SUMS)
+          cat mirror-out/SHA256SUMS
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" mirror-out/* \
+            --title "Indic speech packs mirror ($GITHUB_REF_NAME)" \
+            --notes-file desktop/mirror/RELEASE-NOTES.md

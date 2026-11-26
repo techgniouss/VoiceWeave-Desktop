@@ -1,0 +1,11 @@
+# Files copied to the "mirror-indic-*" release by .github/workflows/mirror-indic.yml.
+# The workflow downloads each file from its original address, refuses it unless the SHA-256 and size match, and only then publishes it.
+# Keep these hashes identical to the ones pinned in desktop/VoiceWeave.Engine/LanguagePacks.cs.
+#
+# name-on-the-mirror                      sha256                                                            bytes      original-address
+indicconformer-te-int8-matmul.onnx       b99c4ce95c572a50d4f484a88cc7e8b502e2f2ba3d725c5a1937f12ff8536819  186479075  https://github.com/saeedtechshop/transly-speech-packs/releases/download/indic-v1/indicconformer-te-int8-matmul.onnx
+indicconformer-te-tokens.txt             dc0b7bbb9eca8d3c8aebf1eb86e3144c90d692b4008cf5a32d46437b942b23ac  2706       https://github.com/saeedtechshop/transly-speech-packs/releases/download/indic-v1/indicconformer-te-tokens.txt
+indicconformer-ta-int8-matmul.onnx       4cc19473ccb7a23b53f65ba3dad9f3c4e53194551f695d080d10c9e39f13ef94  186479075  https://github.com/saeedtechshop/transly-speech-packs/releases/download/indic-v1/indicconformer-ta-int8-matmul.onnx
+indicconformer-ta-tokens.txt             f5a7955261f7eb7156521eecaf17a89521a507d2b740a3a60a2e6f6fb9b3ad36  3042       https://github.com/saeedtechshop/transly-speech-packs/releases/download/indic-v1/indicconformer-ta-tokens.txt
+indicconformer-hi-int8.onnx              c2044177b6d44494fe40be755466845a4c7bd1b5a5d1f6a15b33b2b4ba6011cd  137677313  https://huggingface.co/OpenVoiceOS/ai4bharat-indicconformer-hi-onnx/resolve/8960b8611af5b8c375d442d52907360176410c8b/model.int8.onnx
+indicconformer-hi-vocab.txt              152e58dc9469feb8f74fb006245616ad7cd91b3f7a5ace72ec53f970db10c981  2700       https://huggingface.co/OpenVoiceOS/ai4bharat-indicconformer-hi-onnx/resolve/8960b8611af5b8c375d442d52907360176410c8b/vocab.txt

@@ -1,0 +1,30 @@
+VoiceWeave - copies of third-party speech model files
+
+These files are exact, unmodified copies of files published elsewhere. VoiceWeave downloads them from here first and from the
+original address if this copy is unavailable. Each file is checked against a pinned SHA-256 before it is used.
+
+Telugu and Tamil (indicconformer-te-*, indicconformer-ta-*)
+  Modified versions of the AI4Bharat IndicConformer models (indicconformer_stt_<lang>_hybrid_rnnt_large), prepared for sherpa-onnx
+  by the saeedtechshop/transly-speech-packs project (CTC decoder only, ONNX export, int8 MatMul weights).
+  Original: https://github.com/AI4Bharat/IndicConformerASR
+  Prepared files: https://github.com/saeedtechshop/transly-speech-packs/releases/tag/indic-v1
+
+Hindi (indicconformer-hi-*)
+  ONNX export of ai4bharat/indicconformer_stt_hi_hybrid_ctc_rnnt_large by the OpenVoiceOS community.
+  https://huggingface.co/OpenVoiceOS/ai4bharat-indicconformer-hi-onnx (commit 8960b8611af5b8c375d442d52907360176410c8b)
+
+Licence (all of the above): MIT
+
+  Copyright (c) 2024 AI4Bharat
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation
+  files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy,
+  modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software
+  is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+  OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+  OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

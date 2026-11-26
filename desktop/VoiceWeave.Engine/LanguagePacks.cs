@@ -3,6 +3,9 @@ namespace VoiceWeave.Engine;
 /// <summary>The model files and recogniser for each supported language, with the hashes pinned.</summary>
 public static class LanguagePacks
 {
+    // Our own copy of each file is tried first; the place it was originally published is the fallback. The bytes are identical
+    // (the SHA-256 pinned below is checked either way). desktop/mirror and its workflow make and verify the copy.
+    private const string MirrorBase = "https://github.com/techgniouss/VoiceWeave-Desktop/releases/download/mirror-indic-v1/";
     private const string TranslyBase = "https://github.com/saeedtechshop/transly-speech-packs/releases/download/indic-v1/";
     private const string HindiBase = "https://huggingface.co/OpenVoiceOS/ai4bharat-indicconformer-hi-onnx/resolve/8960b8611af5b8c375d442d52907360176410c8b/";
 
@@ -12,24 +15,29 @@ public static class LanguagePacks
         ("vocab_size", "257"), ("normalize_type", "per_feature"), ("subsampling_factor", "4"), ("model_type", "EncDecCTCModelBPE"),
     };
 
+    /// <summary>A file kept on our mirror under <paramref name="mirrorFile"/>, with the place it came from as the fallback.</summary>
+    private static ModelSpec Hosted(string name, string mirrorFile, string originalUrl, string sha256, long size,
+        Func<string, Task>? transform = null, long? installedSize = null) =>
+        new(name, MirrorBase + mirrorFile, sha256, size, transform, installedSize, new[] { originalUrl });
+
     public static LanguagePack For(Language language) => language switch
     {
         Language.Telugu => Indic(Language.Telugu, "telugu-indic-v1",
-            new ModelSpec("telugu-indic-v1/indicconformer-te-int8-matmul.onnx", TranslyBase + "indicconformer-te-int8-matmul.onnx",
+            Hosted("telugu-indic-v1/indicconformer-te-int8-matmul.onnx", "indicconformer-te-int8-matmul.onnx", TranslyBase + "indicconformer-te-int8-matmul.onnx",
                 "b99c4ce95c572a50d4f484a88cc7e8b502e2f2ba3d725c5a1937f12ff8536819", 186_479_075),
-            new ModelSpec("telugu-indic-v1/indicconformer-te-tokens.txt", TranslyBase + "indicconformer-te-tokens.txt",
+            Hosted("telugu-indic-v1/indicconformer-te-tokens.txt", "indicconformer-te-tokens.txt", TranslyBase + "indicconformer-te-tokens.txt",
                 "dc0b7bbb9eca8d3c8aebf1eb86e3144c90d692b4008cf5a32d46437b942b23ac", 2_706)),
         Language.Tamil => Indic(Language.Tamil, "tamil-indic-v1",
-            new ModelSpec("tamil-indic-v1/indicconformer-ta-int8-matmul.onnx", TranslyBase + "indicconformer-ta-int8-matmul.onnx",
+            Hosted("tamil-indic-v1/indicconformer-ta-int8-matmul.onnx", "indicconformer-ta-int8-matmul.onnx", TranslyBase + "indicconformer-ta-int8-matmul.onnx",
                 "4cc19473ccb7a23b53f65ba3dad9f3c4e53194551f695d080d10c9e39f13ef94", 186_479_075),
-            new ModelSpec("tamil-indic-v1/indicconformer-ta-tokens.txt", TranslyBase + "indicconformer-ta-tokens.txt",
+            Hosted("tamil-indic-v1/indicconformer-ta-tokens.txt", "indicconformer-ta-tokens.txt", TranslyBase + "indicconformer-ta-tokens.txt",
                 "f5a7955261f7eb7156521eecaf17a89521a507d2b740a3a60a2e6f6fb9b3ad36", 3_042)),
         Language.Hindi => Indic(Language.Hindi, "hindi-indic-v1",
-            new ModelSpec("hindi-indic-v1/model.int8.onnx", HindiBase + "model.int8.onnx",
+            Hosted("hindi-indic-v1/model.int8.onnx", "indicconformer-hi-int8.onnx", HindiBase + "model.int8.onnx",
                 "c2044177b6d44494fe40be755466845a4c7bd1b5a5d1f6a15b33b2b4ba6011cd", 137_677_313,
-                Transform: path => OnnxMetadata.AppendAsync(path, HindiMetadata),
-                InstalledSize: 137_677_313 + OnnxMetadata.Encode(HindiMetadata).Length),
-            new ModelSpec("hindi-indic-v1/vocab.txt", HindiBase + "vocab.txt",
+                transform: path => OnnxMetadata.AppendAsync(path, HindiMetadata),
+                installedSize: 137_677_313 + OnnxMetadata.Encode(HindiMetadata).Length),
+            Hosted("hindi-indic-v1/vocab.txt", "indicconformer-hi-vocab.txt", HindiBase + "vocab.txt",
                 "152e58dc9469feb8f74fb006245616ad7cd91b3f7a5ace72ec53f970db10c981", 2_700)),
         _ => new LanguagePack(Language.English, Parakeet.Files.Append(LlamaCleaner.File).ToArray(), dir => new Parakeet(dir)),
     };
