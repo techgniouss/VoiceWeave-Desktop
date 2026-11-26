@@ -109,6 +109,7 @@ public partial class App : Application
         InitEngines();
         StartAudioAndController();
         _ = ApplyWakeWordAsync();
+        if (_settings.FasterCleanup) _ = ApplyFasterCleanupAsync();
         WireOverlay();
         StartHotkey();
         WatchDictionary();
@@ -493,6 +494,54 @@ public partial class App : Application
         var tone = ToneByApp.For(ForegroundApp.ProcessName());
         DiagLog.Write("tone by app: " + tone);
         return tone;
+    }
+
+    public string FasterCleanupStatus { get; private set; } = "";
+    private readonly SemaphoreSlim _fasterGate = new(1, 1);
+
+    public void SetFasterCleanup(bool on)
+    {
+        _settings.FasterCleanup = on;
+        _settings.Save();
+        SettingsChanged?.Invoke();
+        _ = ApplyFasterCleanupAsync();
+    }
+
+    private void SetFasterStatus(string text)
+    {
+        FasterCleanupStatus = text;
+        DiagLog.Write("faster cleanup: " + (text.Length == 0 ? "off" : text));
+        Dispatcher.BeginInvoke(() => SettingsChanged?.Invoke());
+    }
+
+    /// <summary>Switches the cleanup model to the smaller copy (making it first if needed) or back to the standard one, and falls back if it will not load.</summary>
+    private async Task ApplyFasterCleanupAsync()
+    {
+        await _fasterGate.WaitAsync();
+        var standard = Path.Combine(AppPaths.Models, LlamaCleaner.File.Name);
+        try
+        {
+            if (!_settings.FasterCleanup) { _cleaner.UseModel(standard); SetFasterStatus(""); return; }
+            if (_models == null) return;
+            if (!FasterCleanupModel.IsReady(AppPaths.Models))
+            {
+                SetFasterStatus("Preparing the faster cleanup model. This happens once and takes about a minute.");
+                await _models.EnsureAsync(LlamaCleaner.File, AppPaths.Models, null, _exit.Token); // already there after the first English dictation
+                await FasterCleanupModel.EnsureAsync(AppPaths.Models, _exit.Token);
+            }
+            _cleaner.UseModel(FasterCleanupModel.Path(AppPaths.Models));
+            await Task.Run(() => _cleaner.Clean("um hello", Tone.Casual), _exit.Token); // loads it now; a damaged file fails here, not mid-dictation
+            SetFasterStatus("Faster cleanup is on");
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception e)
+        {
+            _cleaner.UseModel(standard);
+            _settings.FasterCleanup = false;
+            _settings.Save();
+            SetFasterStatus("Faster cleanup is not available: " + e.Message);
+        }
+        finally { _fasterGate.Release(); }
     }
 
     public void SetToneByApp(bool on)

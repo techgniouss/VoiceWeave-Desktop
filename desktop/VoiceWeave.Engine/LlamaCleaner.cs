@@ -14,7 +14,7 @@ public sealed class LlamaCleaner : ICleaner
         "66509e0fe1578d2ac4b0773c79a6c83e8d6f218618dfe11e4532beacd999b6e8",
         639_442_784);
 
-    private readonly string _modelPath;
+    private string _modelPath;
     private readonly int _threads;
     private readonly TimeSpan _idleUnload;
     private readonly object _gate = new();
@@ -28,6 +28,18 @@ public sealed class LlamaCleaner : ICleaner
         _threads = threads;
         // Loading takes several seconds, so keep the model (about 0.7 GB) ready for a working session.
         _idleUnload = idleUnload ?? TimeSpan.FromHours(3);
+    }
+
+    /// <summary>Switches to another copy of the model (the smaller one, or back). The old one is unloaded; the new one loads on the next sentence.</summary>
+    public void UseModel(string path)
+    {
+        lock (_gate)
+        {
+            if (string.Equals(path, _modelPath, StringComparison.OrdinalIgnoreCase)) return;
+            _weights?.Dispose();
+            _weights = null;
+            _modelPath = path;
+        }
     }
 
     private const int MaxOutputTokens = 140;

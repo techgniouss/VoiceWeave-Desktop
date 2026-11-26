@@ -50,6 +50,9 @@ public sealed class Settings
     /// <summary>Choose how casual the cleaned-up text is from the program being typed into (chat relaxed, mail formal). Off by default.</summary>
     public bool ToneByApp { get; set; }
 
+    /// <summary>Use a smaller, quicker 4-bit copy of the cleanup model (made once on this computer). Its answers differ slightly, so off by default.</summary>
+    public bool FasterCleanup { get; set; }
+
     /// <summary>Show the cleanup model the person's newest dictionary terms so it spells them their way. Slower, so off by default.</summary>
     public bool VocabularyCleanup { get; set; }
 
