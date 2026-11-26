@@ -407,7 +407,7 @@ public partial class App : Application
                 _tray.SetUndoEnabled(_learner.CanUndo);
             });
         };
-        _controller.Pasted += (result, _) => _learner.Watch(result.Final);
+        _controller.Pasted += (result, _) => _learner.Watch(result.Final, result.Rules);
         _controller.StateChanged += state => { if (state == DictationState.Recording) _learner.Cancel(); };
 
         // History: every dictation that produced text, except text meant for a password box.
@@ -515,6 +515,14 @@ public partial class App : Application
                     case HotkeyAction.StopAndTranscribe: _controller.Finish(); break;
                     case HotkeyAction.Cancel: _controller.Cancel(); break;
                     case HotkeyAction.ForceRegional: _controller.ForceRegional(); break;
+                    case HotkeyAction.Learn:
+                        _controller.Cancel(); // the chord had begun a recording
+                        _ = Task.Run(() =>
+                        {
+                            var message = _learner.TeachSelection(UiaFieldText.ReadFocusedSelection());
+                            Dispatcher.BeginInvoke(() => { if (!message.StartsWith("Remembered", StringComparison.Ordinal)) _overlay.ShowToast(message, 3500); });
+                        });
+                        break;
                     case HotkeyAction.Latch:
                         _controller.Latch();
                         await Dispatcher.BeginInvoke(() => _overlay.SetState(DictationState.Recording, latched: true));

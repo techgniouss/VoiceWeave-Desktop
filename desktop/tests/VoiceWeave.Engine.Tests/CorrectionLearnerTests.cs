@@ -207,6 +207,64 @@ public class CorrectionLearnerTests
     }
 
     [Fact]
+    public void ContextBoundFix_IsOnlyLearnedWhenItRecurs()
+    {
+        var (learner, field, store, _) = Rig("so go too the shop");
+        learner.Watch("so go too the shop");
+        Thread.Sleep(40);
+        field.Text = "so go to the shop";
+        Thread.Sleep(400);
+        Assert.Empty(store.Appended);            // one rewording is not enough
+
+        field.Text = "so go too the shop";
+        learner.Watch("so go too the shop");     // the same slip again, later
+        Thread.Sleep(40);
+        field.Text = "so go to the shop";
+        Assert.True(WaitFor(() => store.Appended.Count == 1));
+        Assert.Equal("go too the => go to the", store.Appended[0]);
+    }
+
+    [Fact]
+    public void FixingWhatARuleWrote_DropsThatRule_AndUndoBringsItBack()
+    {
+        var (learner, field, store, messages) = Rig("send it to Srikanth now");
+        store.Content = "sri kanth => Srikanth";
+        learner.Watch("send it to Srikanth now", new[] { new AppliedRule("sri kanth => Srikanth", "Srikanth") });
+        Thread.Sleep(40);
+        field.Text = "send it to Srikant now";
+        Assert.True(WaitFor(() => store.Content == ""));
+        Assert.Empty(store.Appended);            // nothing new was learned from the same edit
+        Assert.Contains(messages, m => m.StartsWith("Forgot:", StringComparison.Ordinal));
+        Assert.True(learner.CanUndo);
+        Assert.True(learner.UndoLast());
+        Assert.Equal("sri kanth => Srikanth", store.Content.Trim());
+    }
+
+    [Fact]
+    public void TeachSelection_LearnsFromTheLastDictation()
+    {
+        var (learner, _, store, messages) = Rig("unused");
+        learner.Watch(Pasted);
+        var message = learner.TeachSelection("Srikanth");
+        Assert.StartsWith("Remembered", message);
+        Assert.Equal(new[] { "sri kanth => Srikanth" }, store.Appended);
+        Assert.Contains(messages, m => m.Contains("Srikanth"));
+        Assert.True(learner.UndoLast());
+        Assert.Equal("", store.Content.Trim());
+    }
+
+    [Fact]
+    public void TeachSelection_ExplainsWhenItCannotHelp()
+    {
+        var (learner, _, store, _) = Rig("unused");
+        Assert.Contains("Nothing dictated", learner.TeachSelection("Srikanth"));
+        learner.Watch(Pasted);
+        Assert.Contains("Select the corrected word", learner.TeachSelection(null));
+        Assert.Contains("Could not tell", learner.TeachSelection("Kubernetes"));
+        Assert.Empty(store.Appended);
+    }
+
+    [Fact]
     public void WatchEndsAfterItsTimeLimit()
     {
         var field = new FakeField { Text = Before };

@@ -111,11 +111,12 @@
                             <TextBlock Text="Shortcuts" Style="{StaticResource H2}"/>
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                                <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
                                 <TextBlock Grid.Row="0" Text="Hold Ctrl + Win" FontWeight="SemiBold" Margin="0,4"/><TextBlock Grid.Row="0" Grid.Column="1" Text="Speak; release to type" Style="{StaticResource Subtle}" Margin="0,4"/>
                                 <TextBlock Grid.Row="1" Text="Double-tap Ctrl + Win" FontWeight="SemiBold" Margin="0,4"/><TextBlock Grid.Row="1" Grid.Column="1" Text="Hands-free; tap again to finish" Style="{StaticResource Subtle}" Margin="0,4"/>
                                 <TextBlock Grid.Row="2" Text="Esc" FontWeight="SemiBold" Margin="0,4"/><TextBlock Grid.Row="2" Grid.Column="1" Text="Cancel this dictation" Style="{StaticResource Subtle}" Margin="0,4"/>
                                 <TextBlock Grid.Row="3" Text="Ctrl + Win + Shift" FontWeight="SemiBold" Margin="0,4"/><TextBlock Grid.Row="3" Grid.Column="1" Text="Use the regional language for this dictation" Style="{StaticResource Subtle}" Margin="0,4"/>
+                                <TextBlock Grid.Row="4" Text="Ctrl + Win + L" FontWeight="SemiBold" Margin="0,4"/><TextBlock Grid.Row="4" Grid.Column="1" Text="Select the corrected word first: learn it from the last dictation" Style="{StaticResource Subtle}" Margin="0,4"/>
                             </Grid>
                         </StackPanel>
                     </Border>

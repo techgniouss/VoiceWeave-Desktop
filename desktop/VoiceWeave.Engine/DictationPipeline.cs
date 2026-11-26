@@ -6,7 +6,9 @@ using CoreDictionary = VoiceWeave.Core.Dictionary;
 
 namespace VoiceWeave.Engine;
 
-public sealed record PipelineResult(string Raw, string Corrected, string Final, TimeSpan AsrTime, TimeSpan CleanupTime);
+/// <param name="Rules">The dictionary rules that changed the text, so a later fix of their output can be traced back to them.</param>
+public sealed record PipelineResult(string Raw, string Corrected, string Final, TimeSpan AsrTime, TimeSpan CleanupTime,
+    IReadOnlyList<AppliedRule>? Rules = null);
 
 /// <summary>
 /// Audio in, clean text out. Speech is cut at its pauses and each stretch is recognised, corrected by the dictionary and
@@ -51,15 +53,16 @@ public sealed class DictationPipeline(SpeechRouter router, CleanupService cleanu
             var asrTime = sw.Elapsed;
             if (segment == null) return null;
 
-            var corrected = Dictionary.Apply(segment.Text);
+            var fired = new List<AppliedRule>();
+            var corrected = Dictionary.Apply(segment.Text, fired);
             sw.Restart();
             // The cleanup model only understands English; regional text keeps what the recogniser wrote, plus the dictionary.
             var cleaned = Languages.UsesCleanup(segment.Language) ? cleanup.Run(corrected, tone, Dictionary.Terms) : corrected;
             var cleanupTime = sw.Elapsed;
             router.Trace?.Invoke($"   cleanup {cleanupTime.TotalSeconds:F2}s ({segment.Language})");
             // Rules learned from the user's corrections of typed (romanised) text are in English letters, so apply the dictionary again.
-            var final = segment.Language != Language.English && RomanOutput() ? Dictionary.Apply(Romanizer.Convert(cleaned)) : cleaned;
-            return new Piece(segment.Language, segment.Text, corrected, final.Trim(), asrTime, cleanupTime);
+            var final = segment.Language != Language.English && RomanOutput() ? Dictionary.Apply(Romanizer.Convert(cleaned), fired) : cleaned;
+            return new Piece(segment.Language, segment.Text, corrected, final.Trim(), asrTime, cleanupTime, fired);
         }
     }
 
@@ -70,7 +73,8 @@ public sealed class DictationPipeline(SpeechRouter router, CleanupService cleanu
         return peak;
     }
 
-    internal sealed record Piece(Language Language, string Raw, string Corrected, string Final, TimeSpan AsrTime, TimeSpan CleanupTime);
+    internal sealed record Piece(Language Language, string Raw, string Corrected, string Final, TimeSpan AsrTime, TimeSpan CleanupTime,
+        IReadOnlyList<AppliedRule> Rules);
 }
 
 /// <summary>One dictation in progress: audio goes in as it is spoken, finished sentences are processed in the background.</summary>
@@ -128,7 +132,8 @@ public sealed class PipelineSession
             string.Join(' ', pieces.Select(p => p.Corrected)),
             JoinSentences(pieces.Select(p => p.Final)),
             TimeSpan.FromTicks(pieces.Sum(p => p.AsrTime.Ticks)),
-            TimeSpan.FromTicks(pieces.Sum(p => p.CleanupTime.Ticks)));
+            TimeSpan.FromTicks(pieces.Sum(p => p.CleanupTime.Ticks)),
+            pieces.SelectMany(p => p.Rules).DistinctBy(r => r.Line).ToList());
     }
 
     /// <summary>

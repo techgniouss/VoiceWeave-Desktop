@@ -3,22 +3,27 @@ using System.Text.RegularExpressions;
 
 namespace VoiceWeave.Core;
 
+/// <summary>A dictionary rule that changed some text: its line in the dictionary file and the spelling it produced.</summary>
+public sealed record AppliedRule(string Line, string Preferred);
+
 /// <summary>Personal vocabulary: "heard => preferred" rules, applied exactly then fuzzily.</summary>
 public sealed class Dictionary
 {
     private static readonly Regex WordRx = new(@"[\p{L}\p{M}\p{N}'’]+", RegexOptions.Compiled); // \p{M}: vowel signs and viramas inside Indic words
 
-    private readonly record struct Rule(string[] Heard, string Preferred);
+    private readonly record struct Rule(string[] Heard, string Preferred, string Line);
 
     private readonly List<Rule> _rules;
     private readonly List<string> _fuzzyTargets; // single-word preferred forms
     private readonly List<string> _terms;
+    private readonly System.Collections.Generic.Dictionary<string, string> _lineOfPreferred = new(StringComparer.Ordinal);
 
     private Dictionary(List<Rule> rules, List<string> terms)
     {
         _rules = rules.OrderByDescending(r => r.Heard.Length).ToList();
         _terms = terms;
         _fuzzyTargets = terms.Where(t => t.IndexOf(' ') < 0 && t.Length >= 4).Distinct().ToList();
+        foreach (var r in rules) _lineOfPreferred.TryAdd(r.Preferred, r.Line);
     }
 
     public IReadOnlyList<string> Terms => _terms;
@@ -37,13 +42,14 @@ public sealed class Dictionary
             var preferred = line[(i + 2)..].Trim();
             if (heard.Length == 0 || preferred.Length == 0) continue;
             var words = heard.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            rules.Add(new Rule(words, preferred));
+            rules.Add(new Rule(words, preferred, raw.TrimEnd('\r')));
             if (!terms.Contains(preferred)) terms.Add(preferred);
         }
         return new Dictionary(rules, terms);
     }
 
-    public string Apply(string text)
+    /// <param name="fired">When given, receives each rule that changed the text, so a later correction of its output can be traced back to it.</param>
+    public string Apply(string text, ICollection<AppliedRule>? fired = null)
     {
         var tokens = WordRx.Matches(text);
         if (tokens.Count == 0 || _rules.Count == 0) return text;
@@ -53,14 +59,16 @@ public sealed class Dictionary
         var i = 0;
         while (i < tokens.Count)
         {
-            var (consumed, replacement) = MatchPhrase(text, tokens, i);
+            var (consumed, replacement, line) = MatchPhrase(text, tokens, i);
             if (consumed == 0)
             {
                 var tok = tokens[i];
                 replacement = FuzzyReplace(tok.Value);
                 consumed = 1;
                 if (replacement == null) { i++; continue; }
+                line = _lineOfPreferred.GetValueOrDefault(replacement);
             }
+            if (fired != null && line != null && !fired.Any(f => f.Line == line)) fired.Add(new AppliedRule(line, replacement!));
             var first = tokens[i];
             var last = tokens[i + consumed - 1];
             sb.Append(text, pos, first.Index - pos);
@@ -72,7 +80,7 @@ public sealed class Dictionary
         return sb.ToString();
     }
 
-    private (int consumed, string? replacement) MatchPhrase(string text, MatchCollection tokens, int start)
+    private (int consumed, string? replacement, string? line) MatchPhrase(string text, MatchCollection tokens, int start)
     {
         foreach (var rule in _rules)
         {
@@ -89,9 +97,9 @@ public sealed class Dictionary
                     if (gap.Trim().Length != 0) ok = false; // punctuation between words breaks a phrase
                 }
             }
-            if (ok) return (n, rule.Preferred);
+            if (ok) return (n, rule.Preferred, rule.Line);
         }
-        return (0, null);
+        return (0, null, null);
     }
 
     private string? FuzzyReplace(string word)
@@ -103,7 +111,11 @@ public sealed class Dictionary
             if (char.ToLowerInvariant(word[0]) != char.ToLowerInvariant(target[0])) continue;
             if (Math.Abs(word.Length - target.Length) > 1) continue;
             if (EditDistance.Damerau(word.ToLowerInvariant(), target.ToLowerInvariant()) <= 2)
+            {
+                // A real English word is what was meant ("Masks" is not "Marks"): only a near-miss that is no word gets rewritten.
+                if (EnglishWords.IsWord(word)) return null;
                 return target;
+            }
         }
         return null;
     }

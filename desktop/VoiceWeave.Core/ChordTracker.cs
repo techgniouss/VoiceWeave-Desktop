@@ -7,7 +7,7 @@ namespace VoiceWeave.Core;
 /// </summary>
 public sealed class ChordTracker
 {
-    private const uint VK_SHIFT = 0x10, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3, VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_ESCAPE = 0x1B;
+    private const uint VK_SHIFT = 0x10, VK_LSHIFT = 0xA0, VK_RSHIFT = 0xA1, VK_CONTROL = 0x11, VK_LCONTROL = 0xA2, VK_RCONTROL = 0xA3, VK_LWIN = 0x5B, VK_RWIN = 0x5C, VK_ESCAPE = 0x1B, VK_L = 0x4C;
 
     private bool _ctrlLeft, _ctrlRight, _winLeft, _winRight, _active;
 
@@ -24,6 +24,7 @@ public sealed class ChordTracker
         }
         if (!down) return null;
         if (vk is VK_SHIFT or VK_LSHIFT or VK_RSHIFT && _active) return KeyEvent.RegionalDown; // Ctrl+Win+Shift: use the regional language
+        if (vk == VK_L && _active) return KeyEvent.LearnDown;                                         // Ctrl+Win+L: learn the selected word
         return vk == VK_ESCAPE ? KeyEvent.EscDown : KeyEvent.OtherKeyDown;
     }
 

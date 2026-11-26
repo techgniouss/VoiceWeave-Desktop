@@ -28,6 +28,22 @@ public sealed class UiaFieldText : IFieldText
         catch (Exception e) when (IsUiaFailure(e)) { return null; }
     }
 
+    /// <summary>The text selected in the field that has the keyboard focus, or null when there is none or it cannot be read.</summary>
+    public static string? ReadFocusedSelection()
+    {
+        try
+        {
+            var element = AutomationElement.FocusedElement;
+            if (element == null || IsPassword(element)) return null;
+            if (!element.TryGetCurrentPattern(TextPattern.Pattern, out var pattern)) return null;
+            var ranges = ((TextPattern)pattern).GetSelection();
+            if (ranges.Length == 0) return null;
+            var text = ranges[0].GetText(200).Trim();
+            return text.Length == 0 ? null : text;
+        }
+        catch (Exception e) when (IsUiaFailure(e)) { return null; }
+    }
+
     /// <summary>Wraps a known element (used by tests, which cannot take the keyboard focus).</summary>
     internal static IFieldText? FromElement(AutomationElement element)
     {

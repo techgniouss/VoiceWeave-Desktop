@@ -13,6 +13,15 @@ public class HotkeyMachineTests
     }
 
     [Fact]
+    public void LearnKeyDuringTheChord_LearnsInsteadOfDictating()
+    {
+        var m = New();
+        m.On(KeyEvent.HoldDown, 0);
+        Assert.Equal(HotkeyAction.Learn, m.On(KeyEvent.LearnDown, 50));
+        Assert.Equal(HotkeyAction.None, m.On(KeyEvent.HoldUp, 400)); // releasing the chord afterwards does nothing
+    }
+
+    [Fact]
     public void TapUnderMinHold_CancelsSilently()
     {
         var m = New();

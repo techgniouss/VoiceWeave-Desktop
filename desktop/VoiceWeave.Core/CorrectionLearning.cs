@@ -75,6 +75,54 @@ public static class CorrectionLearning
         return new LearnedEdit(before, after, oldWords, newWords, IsGeneral(oldWords, newWords));
     }
 
+    /// <summary>
+    /// The fix implied by a corrected word the user selected: finds the stretch of the last dictation (up to three words) that
+    /// most resembles <paramref name="selection"/> and treats it as what was misheard. Null when nothing is clearly similar.
+    /// </summary>
+    public static LearnedEdit? FromSelection(string dictation, string selection)
+    {
+        selection = selection.Trim();
+        var words = Tokens(dictation);
+        if (words.Count == 0 || selection.Length == 0 || selection.Length > 48 || Unsafe(selection) || Tokens(selection).Count == 0) return null;
+        var target = Squash(selection);
+
+        (int First, int Last, double Score)? best = null;
+        var bestHeard = "";
+        var tied = false;
+        for (var size = 1; size <= MaxTokensPerSide; size++)
+            for (var i = 0; i + size <= words.Count; i++)
+            {
+                var last = i + size - 1;
+                var heard = dictation[words[i].Start..words[last].End];
+                if (heard == selection) return null; // the dictation already reads like this
+                var squashed = Squash(heard);
+                var longest = Math.Max(squashed.Length, target.Length);
+                var distance = EditDistance.Levenshtein<char>(squashed.ToCharArray(), target.ToCharArray());
+                var score = (double)distance / longest;
+                if (score > 0.45) continue;
+                if (best == null || score < best.Value.Score - 1e-9) { best = (i, last, score); bestHeard = heard; tied = false; }
+                else if (Math.Abs(score - best.Value.Score) < 1e-9 && (i > best.Value.Last || last < best.Value.First)
+                         && !string.Equals(heard, bestHeard, StringComparison.Ordinal)) tied = true; // different words somewhere else, just as close
+            }
+        if (best == null || tied) return null;
+
+        var (firstWord, lastWord, _) = best.Value;
+        var oldWords = dictation[words[firstWord].Start..words[lastWord].End];
+        var firstOld = Math.Max(0, firstWord - 1);
+        var lastOld = Math.Min(words.Count - 1, lastWord + 1);
+        var before = dictation[words[firstOld].Start..words[lastOld].End];
+        var after = dictation[words[firstOld].Start..words[firstWord].Start] + selection + dictation[words[lastWord].End..words[lastOld].End];
+        if (before.Length > 90 || after.Length > 90 || Unsafe(before) || Unsafe(oldWords)) return null;
+        return new LearnedEdit(before, after, oldWords, selection, IsGeneral(oldWords, selection));
+    }
+
+    /// <summary>Lower-case letters and digits only, so "sri kanth" and "Srikanth" compare as the same sound-alike.</summary>
+    private static string Squash(string text) =>
+        string.Concat(Tokens(text).Select(t => t.Text.ToLowerInvariant().Replace("'", "").Replace("’", "")));
+
+    /// <summary>The words of <paramref name="text"/> in lower case, one space apart.</summary>
+    internal static string Normalize(string text) => string.Join(' ', Tokens(text).Select(t => t.Text.ToLowerInvariant()));
+
     private static bool Unsafe(string text) => text.Contains('\n') || text.Contains("=>", StringComparison.Ordinal);
 
     /// <summary>Whether a fix should apply everywhere. Swapping one ordinary word for another is only right in context.</summary>
@@ -115,6 +163,25 @@ public static class DictionaryRules
         if (currentDictionaryText.Length + 1 + line.Length > MaxDictionaryChars)
             return new LearnResult(null, "The personal dictionary is full. Remove a rule from it first.");
         return new LearnResult(line, $"Remembered: {phrase} → {spelling}");
+    }
+
+    /// <summary>
+    /// Whether the words the user changed are (part of) what a dictionary rule wrote, or contain it: the person is fixing the
+    /// rule's own output, so the rule is wrong.
+    /// </summary>
+    public static bool Touches(string changedWords, string preferred)
+    {
+        var changed = " " + CorrectionLearning.Normalize(changedWords) + " ";
+        var written = " " + CorrectionLearning.Normalize(preferred) + " ";
+        if (changed.Trim().Length == 0 || written.Trim().Length == 0) return false;
+        return written.Contains(changed, StringComparison.Ordinal) || changed.Contains(written, StringComparison.Ordinal);
+    }
+
+    /// <summary>The "heard => preferred" parts of a dictionary line, or null for anything else.</summary>
+    public static (string Heard, string Preferred)? Split(string line)
+    {
+        var at = line.IndexOf("=>", StringComparison.Ordinal);
+        return at <= 0 ? null : (line[..at].Trim(), line[(at + 2)..].Trim());
     }
 
     /// <summary>Removes one exact copy of each added line, leaving every other edit to the dictionary alone.</summary>

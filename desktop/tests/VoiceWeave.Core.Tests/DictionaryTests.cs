@@ -26,6 +26,34 @@ public class DictionaryTests
     }
 
     [Fact]
+    public void Fuzzy_LeavesRealEnglishWordsAlone()
+    {
+        var d = Dictionary.Parse("marks => Marks");
+        Assert.Equal("the masks were here", d.Apply("the masks were here"));
+        Assert.Equal("Marks were here", d.Apply("Mraks were here")); // a typo-like near miss still gets fixed
+    }
+
+    [Fact]
+    public void Apply_ReportsTheRulesThatFired()
+    {
+        var d = Dictionary.Parse("sri kanth => Srikanth\nquark us => Quarkus");
+        var fired = new List<AppliedRule>();
+        d.Apply("ask sri kanth about it", fired);
+        var rule = Assert.Single(fired);
+        Assert.Equal("sri kanth => Srikanth", rule.Line);
+        Assert.Equal("Srikanth", rule.Preferred);
+    }
+
+    [Fact]
+    public void Apply_ReportsAFuzzyMatchToo()
+    {
+        var d = Dictionary.Parse("srikanth => Srikanth");
+        var fired = new List<AppliedRule>();
+        d.Apply("Srikunth deployed it", fired);
+        Assert.Equal("srikanth => Srikanth", Assert.Single(fired).Line);
+    }
+
+    [Fact]
     public void NoReplacementInsideLongerWords()
     {
         var d = Dictionary.Parse("cat => Kat");

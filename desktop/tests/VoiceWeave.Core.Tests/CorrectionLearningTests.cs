@@ -194,6 +194,57 @@ public class DictionaryRulesTests
             DictionaryRules.RemoveLines("ai => AI\nai => Ai\nai => AI", new[] { "ai => AI" }));
 
     [Fact]
+    public void Touches_WhenTheFixedWordsAreWhatTheRuleWrote()
+    {
+        Assert.True(DictionaryRules.Touches("Srikanth", "Srikanth"));
+        Assert.True(DictionaryRules.Touches("CD", "Argo CD"));
+        Assert.True(DictionaryRules.Touches("use Argo CD", "argo cd"));
+        Assert.False(DictionaryRules.Touches("tomorrow", "Srikanth"));
+        Assert.False(DictionaryRules.Touches("", "Srikanth"));
+    }
+
+    [Fact]
+    public void Split_SeparatesHeardFromPreferred()
+    {
+        Assert.Equal(("sri kanth", "Srikanth"), DictionaryRules.Split("sri kanth => Srikanth"));
+        Assert.Null(DictionaryRules.Split("no arrow here"));
+    }
+
+    [Fact]
+    public void FromSelection_FindsTheMishearingThatTheSelectedWordFixes()
+    {
+        var edit = CorrectionLearning.FromSelection("please send it to sri kanth tomorrow", "Srikanth");
+        Assert.NotNull(edit);
+        Assert.Equal("sri kanth", edit!.OldWord);
+        Assert.Equal("Srikanth", edit.NewWord);
+        Assert.True(edit.General);
+        Assert.Equal("sri kanth => Srikanth", DictionaryRules.TryLearn("", edit).Line);
+    }
+
+    [Fact]
+    public void FromSelection_HandlesACapitalisationFix()
+    {
+        var edit = CorrectionLearning.FromSelection("we use quarkus here", "Quarkus");
+        Assert.Equal("quarkus => Quarkus", DictionaryRules.TryLearn("", edit!).Line);
+    }
+
+    [Fact]
+    public void FromSelection_NothingSimilar_LearnsNothing()
+    {
+        Assert.Null(CorrectionLearning.FromSelection("please send it tomorrow", "Kubernetes"));
+        Assert.Null(CorrectionLearning.FromSelection("", "Quarkus"));
+        Assert.Null(CorrectionLearning.FromSelection("please send it", ""));
+    }
+
+    [Fact]
+    public void FromSelection_TextAlreadyReadsThatWay_LearnsNothing() =>
+        Assert.Null(CorrectionLearning.FromSelection("ask Srikanth now", "Srikanth"));
+
+    [Fact]
+    public void FromSelection_TwoEquallyCloseSpots_IsTooAmbiguous() =>
+        Assert.Null(CorrectionLearning.FromSelection("sri kant met sri kanta", "Srikanth"));
+
+    [Fact]
     public void RemoveLines_KeepsARuleEditedAfterLearning() =>
         Assert.Equal("ai => A.I.", DictionaryRules.RemoveLines("ai => A.I.", new[] { "ai => AI" }));
 
