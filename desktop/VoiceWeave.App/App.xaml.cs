@@ -186,6 +186,14 @@ public partial class App : Application
         _ = ApplyWakeWordAsync();
     }
 
+    public void SetWakeWordCloseOnly(bool on)
+    {
+        _settings.WakeWordCloseOnly = on;
+        _settings.Save();
+        if (_wake != null) _wake.MinLevel = on ? _settings.WakeWordMinLevel : 0f;
+        SettingsChanged?.Invoke();
+    }
+
     /// <returns>Null when the phrase was accepted, otherwise what is wrong with it.</returns>
     public string? SetWakeWordPhrase(string phrase)
     {
@@ -235,7 +243,9 @@ public partial class App : Application
             var dir = Path.Combine(AppPaths.Models, WakeWordModel.Folder);
             var spotter = await Task.Run(() => new WakeWordSpotter(dir, _settings.WakeWordPhrase, _settings.WakeWordBoost, _settings.WakeWordThreshold));
             var service = new WakeWordService(spotter) { Paused = () => _controller.State != DictationState.Idle };
+            service.MinLevel = _settings.WakeWordCloseOnly ? _settings.WakeWordMinLevel : 0f;
             service.Heard += OnWakeWordHeard;
+            service.TooQuiet += OnWakeWordTooQuiet;
             _wake = service;
             _mic.Samples += service.Feed;
             if (!StandbyMic(true)) throw new InvalidOperationException("the microphone could not be opened");
@@ -265,6 +275,24 @@ public partial class App : Application
             }
         }
         catch (OperationCanceledException) { }
+    }
+
+    private long _quietNoticeAt;
+
+    /// <summary>The phrase was heard but too quietly: say so in the window (so a quiet voice or mic is not a silent failure), then go back to "Listening".</summary>
+    private void OnWakeWordTooQuiet(float level)
+    {
+        DiagLog.Write($"wake word ignored: too quiet (level {level:F3}, needs {_settings.WakeWordMinLevel:F3})");
+        var service = _wake;
+        if (service == null) return;
+        var phrase = _settings.WakeWordPhrase;
+        var stamp = Environment.TickCount64;
+        _quietNoticeAt = stamp;
+        SetWakeStatus($"Heard \"{phrase}\" but too quietly, so it was ignored. Speak closer or louder, or turn off \"Only respond to close, clear speech\".");
+        _ = Task.Delay(8000).ContinueWith(_ =>
+        {
+            if (_quietNoticeAt == stamp && ReferenceEquals(_wake, service)) SetWakeStatus($"Listening for \"{_settings.WakeWordPhrase}\"");
+        });
     }
 
     private void OnWakeWordHeard()

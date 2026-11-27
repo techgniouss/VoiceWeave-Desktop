@@ -259,7 +259,9 @@
                                 <TextBox x:Name="WakePhraseBox" Width="240" MaxLength="40"/>
                                 <Button Content="Set phrase" Style="{StaticResource GhostButton}" Margin="10,0,0,0" Click="OnSetWakePhrase"/>
                             </StackPanel>
-                            <TextBlock x:Name="WakeStatusText" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                            <TextBlock x:Name="WakeStatusText" Style="{StaticResource Subtle}" TextWrapping="Wrap" Margin="0,8,0,8"/>
+                            <CheckBox x:Name="WakeCloseBox" Content="Only respond to close, clear speech" Style="{StaticResource Switch}" Click="OnWakeCloseClicked"/>
+                            <TextBlock Text="Ignores the phrase when it is quiet, like a TV or people talking across the room. Turn it off if it misses you when you speak softly or sit far from the microphone." Style="{StaticResource Subtle}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
 

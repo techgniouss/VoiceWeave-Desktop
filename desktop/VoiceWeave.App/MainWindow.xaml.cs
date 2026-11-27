@@ -107,6 +107,7 @@ public partial class MainWindow : Window
             WakeBox.IsChecked = s.WakeWordEnabled;
             if (!WakePhraseBox.IsKeyboardFocusWithin) WakePhraseBox.Text = s.WakeWordPhrase;
             WakeStatusText.Text = _app.WakeWordStatus;
+            WakeCloseBox.IsChecked = s.WakeWordCloseOnly;
             foreach (ComboBoxItem item in RetentionBox.Items) if ((int)item.Tag == s.HistoryDays) RetentionBox.SelectedItem = item;
             RetentionBox.IsEnabled = s.KeepHistory;
             ModelsPath.Text = AppPaths.Models;
@@ -147,6 +148,7 @@ public partial class MainWindow : Window
     private void OnVocabClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetVocabularyCleanup(VocabBox.IsChecked == true); }
     private void OnSoundAlikeClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetSoundAlike(SoundAlikeBox.IsChecked == true); }
     private void OnWakeClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetWakeWord(WakeBox.IsChecked == true); }
+    private void OnWakeCloseClicked(object sender, RoutedEventArgs e) { if (!_loading) _app.SetWakeWordCloseOnly(WakeCloseBox.IsChecked == true); }
     private void OnSetWakePhrase(object sender, RoutedEventArgs e)
     {
         var problem = _app.SetWakeWordPhrase(WakePhraseBox.Text);

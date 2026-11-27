@@ -4,8 +4,19 @@ using SherpaOnnx;
 
 namespace VoiceWeave.Engine;
 
+/// <summary>Something that listens for one phrase in 16 kHz audio (the real model, or a stand-in in tests).</summary>
+public interface IWakeSpotter : IDisposable
+{
+    /// <summary>Forgets the audio heard so far.</summary>
+    void Reset();
+    /// <returns>True when the phrase was just heard.</returns>
+    bool Feed(float[] samples);
+    /// <summary>Listens for a different phrase from now on.</summary>
+    void SetPhrase(string phrase);
+}
+
 /// <summary>A small streaming model (sherpa-onnx keyword spotter) that listens for one phrase in 16 kHz audio.</summary>
-public sealed class WakeWordSpotter : IDisposable
+public sealed class WakeWordSpotter : IWakeSpotter
 {
     public const int SampleRate = 16000;
 
@@ -187,29 +198,39 @@ public sealed class WakeWordService : IDisposable
 {
     private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(2);
 
-    private readonly WakeWordSpotter _spotter;
+    private readonly IWakeSpotter _spotter;
     private readonly Channel<float[]> _audio = Channel.CreateBounded<float[]>(
         new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
     private readonly Task _worker;
     private long _busyTicks;
     private long _audioSamples;
     private readonly VoiceWeave.Core.QuietGate _gate = new();
+    private readonly VoiceWeave.Core.LevelWindow _levels = new();
     private DateTime _lastHeard = DateTime.MinValue;
     private volatile bool _restart = true;
 
     /// <summary>True while the phrase should not be listened for (recording or processing a dictation).</summary>
     public Func<bool> Paused { get; set; } = () => false;
 
+    /// <summary>
+    /// How loud the phrase must have been (0 to 1, as the loudest 30 ms of the last two seconds) to count. Someone at the microphone
+    /// is loud; a TV or people across the room are quiet. 0 accepts any loudness.
+    /// </summary>
+    public volatile float MinLevel;
+
     /// <summary>Raised on the worker thread when the phrase is heard.</summary>
     public event Action? Heard;
 
-    public WakeWordService(WakeWordSpotter spotter)
+    /// <summary>Raised on the worker thread when the phrase was heard but too quietly to count, with how loud it was.</summary>
+    public event Action<float>? TooQuiet;
+
+    public WakeWordService(IWakeSpotter spotter)
     {
         _spotter = spotter;
         _worker = Task.Run(RunAsync);
     }
 
-    public WakeWordSpotter Spotter => _spotter;
+    public IWakeSpotter Spotter => _spotter;
 
     /// <summary>Seconds of CPU the model used per second of audio it listened to (0.02 is two percent of one core).</summary>
     public double CpuPerAudioSecond
@@ -225,7 +246,8 @@ public sealed class WakeWordService : IDisposable
     /// <summary>Called from the microphone callback; cheap, never blocks. Silence is dropped here, so a quiet room costs next to nothing.</summary>
     public void Feed(float[] samples)
     {
-        if (Paused()) { _gate.Reset(); return; }
+        if (Paused()) { _gate.Reset(); _levels.Clear(); return; }
+        _levels.Push(samples);
         Interlocked.Add(ref _audioSamples, samples.Length); // all the sound heard, quiet or not, so the load figure is per second of listening
         var passed = _gate.Process(samples, out var restart);
         if (restart) _restart = true;
@@ -243,6 +265,8 @@ public sealed class WakeWordService : IDisposable
                 var heard = _spotter.Feed(samples);
                 Interlocked.Add(ref _busyTicks, timer.Elapsed.Ticks);
                 if (!heard || DateTime.UtcNow - _lastHeard < Cooldown) continue;
+                var level = _levels.Peak;
+                if (level < MinLevel) { TooQuiet?.Invoke(level); continue; }
                 _lastHeard = DateTime.UtcNow;
                 Heard?.Invoke();
             }

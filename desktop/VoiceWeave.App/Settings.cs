@@ -77,6 +77,12 @@ public sealed class Settings
     /// <summary>How strongly the phrase is favoured over other sounds. Higher finds it more easily and also fires more falsely.</summary>
     public float WakeWordBoost { get; set; } = 3.0f;
 
+    /// <summary>Only react to the wake phrase when it is spoken loudly, as when close to the microphone, so a TV or people across the room do not start it.</summary>
+    public bool WakeWordCloseOnly { get; set; } = true;
+
+    /// <summary>How loud the phrase must be for <see cref="WakeWordCloseOnly"/> (0 to 1; normal speech at the microphone is around 0.08 to 0.15, a TV across the room 0.01 to 0.03).</summary>
+    public float WakeWordMinLevel { get; set; } = 0.04f;
+
     public static Settings Load()
     {
         try { return JsonSerializer.Deserialize<Settings>(File.ReadAllText(AppPaths.SettingsFile)) ?? new Settings(); }
