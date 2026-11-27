@@ -47,13 +47,52 @@ public sealed class WakeWordTokenizer
         return string.Join(' ', all);
     }
 
-    /// <summary>The line the keyword spotter reads: pieces, then the boost and the threshold that trigger it.</summary>
+    /// <summary>
+    /// The line the keyword spotter reads: for each way of spelling the phrase in pieces, the pieces, then the boost and the
+    /// threshold that trigger it. The model was trained on the splits a sentencepiece tokenizer picks, which is not always the
+    /// fewest-pieces split, so every plausible split is listened for at once (separated by "/") and any of them can trigger it.
+    /// </summary>
     public string? KeywordLine(string phrase, float boost, float threshold)
     {
-        var pieces = Encode(phrase);
-        if (pieces == null) return null;
-        var name = string.Join('_', Words(phrase)!);
-        return string.Create(CultureInfo.InvariantCulture, $"{pieces} :{boost:0.0#} #{threshold:0.0#} @{name}");
+        var words = Words(phrase);
+        if (words == null) return null;
+        var perWord = new List<List<string>>();
+        foreach (var word in words)
+        {
+            var splits = Splits(WordStart + word);
+            if (splits.Count == 0) return null;
+            perWord.Add(splits.Take(MaxSplitsPerWord).Select(p => string.Join(' ', p)).ToList());
+        }
+        var variants = new List<string> { "" };
+        foreach (var options in perWord)
+            variants = variants.SelectMany(v => options.Select(o => v.Length == 0 ? o : v + " " + o)).Take(MaxVariants).ToList();
+        var name = string.Join('_', words);
+        return string.Join('/', variants.Select(v => string.Create(CultureInfo.InvariantCulture, $"{v} :{boost:0.0#} #{threshold:0.0#} @{name}")));
+    }
+
+    private const int MaxSplitsPerWord = 6;
+    private const int MaxVariants = 32;
+
+    /// <summary>Every way the vocabulary can spell the word, fewest pieces first.</summary>
+    private List<List<string>> Splits(string word)
+    {
+        var result = new List<List<string>>();
+        var current = new List<string>();
+        void Walk(int at)
+        {
+            if (result.Count >= 200) return;
+            if (at == word.Length) { result.Add(new List<string>(current)); return; }
+            for (var end = at + 1; end <= Math.Min(word.Length, at + MaxPieceLength); end++)
+            {
+                var piece = word[at..end];
+                if (!_pieces.Contains(piece)) continue;
+                current.Add(piece);
+                Walk(end);
+                current.RemoveAt(current.Count - 1);
+            }
+        }
+        Walk(0);
+        return result.OrderBy(p => p.Count).ThenBy(p => string.Join(' ', p), StringComparer.Ordinal).ToList();
     }
 
     // Fewest pieces wins (long pieces are what the model saw most in training); a word the vocabulary cannot spell gives null.

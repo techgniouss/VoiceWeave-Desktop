@@ -44,7 +44,18 @@ public class WakeWordTokenizerTests
     public void KeywordLine_CarriesBoostThresholdAndName()
     {
         var line = Make().KeywordLine("hey voice", 2.0f, 0.25f);
-        Assert.Equal($"{S}HEY {S}VOICE :2.0 #0.25 @HEY_VOICE", line);
+        Assert.Equal($"{S}HEY {S}VOICE :2.0 #0.25 @HEY_VOICE", line!.Split('/')[0]);
+    }
+
+    [Fact]
+    public void KeywordLine_ListensForEverySplit_FewestPiecesFirst()
+    {
+        var tokenizer = new WakeWordTokenizer(new[] { S.ToString(), "H", "E", "Y", "HE", "HEY", S + "HE", S + "HEY" });
+        var line = tokenizer.KeywordLine("hey", 2.0f, 0.25f)!;
+        var variants = line.Split('/');
+        Assert.True(variants.Length > 1);
+        Assert.StartsWith($"{S}HEY :2.0", variants[0]);
+        Assert.All(variants, v => Assert.EndsWith("#0.25 @HEY", v));
     }
 
     [Fact]

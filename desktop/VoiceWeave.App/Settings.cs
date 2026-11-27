@@ -72,10 +72,10 @@ public sealed class Settings
     public string WakeWordPhrase { get; set; } = "hey voice";
 
     /// <summary>How sure the model must be before it reacts (0 to 1). Raise it if it starts by mistake, lower it if it misses you.</summary>
-    public float WakeWordThreshold { get; set; } = 0.25f;
+    public float WakeWordThreshold { get; set; } = 0.2f;
 
     /// <summary>How strongly the phrase is favoured over other sounds. Higher finds it more easily and also fires more falsely.</summary>
-    public float WakeWordBoost { get; set; } = 2.0f;
+    public float WakeWordBoost { get; set; } = 3.0f;
 
     public static Settings Load()
     {
