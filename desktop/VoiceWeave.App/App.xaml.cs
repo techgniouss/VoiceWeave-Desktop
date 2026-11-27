@@ -24,6 +24,10 @@ public partial class App : Application
     private MainWindow? _main;
     private TrayIcon _tray = null!;
     private WaveInMic? _mic;
+    private Recorder _recorder = null!;
+    // The microphone is open only while dictating, unless the wake word needs it open all the time (_micStandby).
+    private readonly object _micGate = new();
+    private bool _micStandby;
     private Win32Clipboard? _clipboard;
     private KeyboardHook? _hook;
     private DictationController _controller = null!;
@@ -222,7 +226,7 @@ public partial class App : Application
         try
         {
             StopWakeWord();
-            if (!_settings.WakeWordEnabled) { SetWakeStatus(""); return; }
+            if (!_settings.WakeWordEnabled) { StandbyMic(false); SetWakeStatus(""); return; }
             if (_mic == null || _models == null) { SetWakeStatus("No microphone available"); return; }
 
             var progress = new Progress<double>(p => { if (p is > 0 and < 1) SetWakeStatus($"Downloading the wake word model: {p:P0}"); });
@@ -234,6 +238,7 @@ public partial class App : Application
             service.Heard += OnWakeWordHeard;
             _wake = service;
             _mic.Samples += service.Feed;
+            if (!StandbyMic(true)) throw new InvalidOperationException("the microphone could not be opened");
             SetWakeStatus($"Listening for \"{_settings.WakeWordPhrase}\"");
             _ = Task.Run(() => LogWakeWordLoadAsync(service));
         }
@@ -241,6 +246,7 @@ public partial class App : Application
         catch (Exception e)
         {
             StopWakeWord();
+            StandbyMic(false);
             SetWakeStatus("The wake word is unavailable: " + e.Message);
         }
         finally { _wakeGate.Release(); }
@@ -267,7 +273,7 @@ public partial class App : Application
         DiagLog.Write("wake word heard");
         _ender.Start(Environment.TickCount64);
         _wakeSession = true;
-        _controller.Begin(latched: true, dropPreRoll: true);
+        BeginDictation(latched: true, dropPreRoll: true);
     }
 
     /// <summary>Ends a dictation started by the wake phrase once the person stops talking (or never starts).</summary>
@@ -578,15 +584,53 @@ public partial class App : Application
 
     // ---- audio, controller ---------------------------------------------------------------------------------------
 
+    /// <summary>Opens the microphone (if closed) and starts a dictation, as one step so it is not closed in between.</summary>
+    private void BeginDictation(bool latched, bool dropPreRoll = false)
+    {
+        lock (_micGate)
+        {
+            try { _recorder.Arm(); }
+            catch (Exception e)
+            {
+                Status("No microphone available: " + e.Message, toast: true);
+                return;
+            }
+            _controller.Begin(latched, dropPreRoll);
+        }
+    }
+
+    /// <summary>Keeps the microphone open between dictations (wake word on) or lets it close when idle. False if it could not be opened.</summary>
+    private bool StandbyMic(bool on)
+    {
+        lock (_micGate)
+        {
+            _micStandby = on;
+            if (on)
+            {
+                try { _recorder.Arm(); }
+                catch (Exception e) { _micStandby = false; DiagLog.Write("microphone: " + e.Message); return false; }
+                return true;
+            }
+        }
+        ReleaseMicIfIdle();
+        return true;
+    }
+
+    /// <summary>Closes the microphone once nothing is recording, unless the wake word is listening through it.</summary>
+    private void ReleaseMicIfIdle()
+    {
+        lock (_micGate)
+        {
+            if (_micStandby || _controller.State == DictationState.Recording) return;
+            _recorder.Disarm();
+        }
+    }
+
     private void StartAudioAndController()
     {
         _mic = new WaveInMic();
-        var recorder = new Recorder(_mic, new PreRoll(16000, 500));
-        try { recorder.Arm(); }
-        catch (Exception e)
-        {
-            Status("No microphone available: " + e.Message, toast: true);
-        }
+        var recorder = _recorder = new Recorder(_mic, new PreRoll(16000, 500));
+        // No Arm() here: the microphone stays closed until a dictation starts or the wake word is switched on.
         _clipboard = new Win32Clipboard(_overlay.Handle);
         // Each dictation gets a session that recognises sentences while you are still speaking.
         _controller = new DictationController(recorder,
@@ -612,6 +656,7 @@ public partial class App : Application
         _controller.Pasted += (result, _) => _learner.Watch(result.Final, result.Rules);
         _controller.StateChanged += state => { if (state == DictationState.Recording) _learner.Cancel(); };
         _controller.StateChanged += state => { if (state != DictationState.Recording) _wakeSession = false; };
+        _controller.StateChanged += state => { if (state != DictationState.Recording) _ = Task.Run(ReleaseMicIfIdle); };
         _controller.Level += OnWakeLevel;
 
         // History: every dictation that produced text, except text meant for a password box.
@@ -647,12 +692,12 @@ public partial class App : Application
     private void WireOverlay()
     {
         _overlay.MenuRequested += () => _tray.ShowMenu();
-        _overlay.HoldStarted += () => _controller.Begin(latched: false);
+        _overlay.HoldStarted += () => BeginDictation(latched: false);
         _overlay.HoldEnded += () => _controller.Finish();
         _overlay.Clicked += () =>
         {
             if (_controller.State == DictationState.Recording) _controller.Finish();
-            else _controller.Begin(latched: true);
+            else BeginDictation(latched: true);
         };
     }
 
@@ -718,7 +763,7 @@ public partial class App : Application
                 if (action != HotkeyAction.None) DiagLog.Write($"hotkey: {ev} -> {action}");
                 switch (action)
                 {
-                    case HotkeyAction.StartRecording: _controller.Begin(latched: false); break;
+                    case HotkeyAction.StartRecording: BeginDictation(latched: false); break;
                     case HotkeyAction.StopAndTranscribe: _controller.Finish(); break;
                     case HotkeyAction.Cancel: _controller.Cancel(); break;
                     case HotkeyAction.ForceRegional: _controller.ForceRegional(); break;
